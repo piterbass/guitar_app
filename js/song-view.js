@@ -1,0 +1,121 @@
+// ============================================================
+// song-view.js  –  Vista lectura de canción + voicings pineados
+// ============================================================
+
+(function () {
+  const { createDiagram } = window.FretboardSVG;
+  const SB = window.Songbook;
+
+  let currentSongId = null;
+  let fontSize = 16;
+
+  function open(songId) {
+    const song = SB.getSong(songId);
+    if (!song) return;
+
+    currentSongId = songId;
+    fontSize = 16;
+
+    document.getElementById('view-title').textContent = song.title;
+    document.getElementById('view-artist').textContent = song.artist || '';
+
+    renderLyrics(song);
+    renderPinnedBar(song);
+
+    window.UI.showSection('song-view');
+  }
+
+  function renderLyrics(song) {
+    const container = document.getElementById('view-lyrics');
+    container.style.fontSize = fontSize + 'px';
+    container.innerHTML = window.SongEditor.renderContent(song.content, false);
+
+    // Hacer clickeables los chord-markers
+    container.querySelectorAll('.chord-marker').forEach(el => {
+      el.addEventListener('click', () => {
+        const chordName = el.dataset.chord;
+        highlightPinned(chordName);
+      });
+    });
+  }
+
+  function renderPinnedBar(song) {
+    const bar = document.getElementById('view-pinned-bar');
+    bar.innerHTML = '';
+
+    if (!song.pinnedVoicings || song.pinnedVoicings.length === 0) {
+      bar.innerHTML = '<span class="pinned-placeholder">No hay voicings pineados. Edita la cancion para agregar.</span>';
+      return;
+    }
+
+    song.pinnedVoicings.forEach(pv => {
+      const voicing = toVoicing(pv.frets);
+      const card = document.createElement('div');
+      card.className = 'voicing-card pinned-bar-card';
+      card.dataset.chord = pv.chord;
+      card.appendChild(createDiagram(voicing, pv.chord));
+      bar.appendChild(card);
+    });
+  }
+
+  function highlightPinned(chordName) {
+    const bar = document.getElementById('view-pinned-bar');
+    // Quitar highlights previos
+    bar.querySelectorAll('.pinned-bar-card').forEach(c => c.classList.remove('highlight'));
+    // Resaltar los del acorde
+    bar.querySelectorAll(`.pinned-bar-card[data-chord="${chordName}"]`).forEach(c => {
+      c.classList.add('highlight');
+      c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    });
+    // Quitar highlight después de 2s
+    setTimeout(() => {
+      bar.querySelectorAll('.highlight').forEach(c => c.classList.remove('highlight'));
+    }, 2000);
+  }
+
+  function changeFontSize(delta) {
+    fontSize = Math.max(10, Math.min(32, fontSize + delta));
+    const container = document.getElementById('view-lyrics');
+    container.style.fontSize = fontSize + 'px';
+  }
+
+  function editCurrent() {
+    if (currentSongId) window.SongEditor.open(currentSongId);
+  }
+
+  function printSong() {
+    window.print();
+  }
+
+  function backToList() {
+    window.SongListView.render();
+    window.UI.showSection('songs');
+  }
+
+  function toVoicing(frets) {
+    const noteNames = frets.map((f, i) => {
+      if (f === -1) return 'X';
+      return window.MusicTheory.pcToName(window.MusicTheory.fretToPC(i, f));
+    });
+    const barre = window.VoicingFinder.detectBarre(frets);
+    const fingers = window.VoicingFinder.suggestFingers(frets, barre);
+    return { frets, noteNames, barre, fingers };
+  }
+
+  // Event bindings (called after DOM ready)
+  function initEvents() {
+    document.getElementById('btn-view-print').addEventListener('click', printSong);
+    document.getElementById('btn-view-edit').addEventListener('click', editCurrent);
+    document.getElementById('btn-view-back').addEventListener('click', backToList);
+    document.getElementById('btn-font-up').addEventListener('click', () => changeFontSize(2));
+    document.getElementById('btn-font-down').addEventListener('click', () => changeFontSize(-2));
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initEvents);
+  } else {
+    initEvents();
+  }
+
+  window.SongView = { open };
+})();

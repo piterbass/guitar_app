@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Guitar App - Acordes & Escalas</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#e94560">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Guitar App">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── Header + Nav ────────────────────────────── */
+    header {
+      position: relative;
+      overflow: hidden;
+      border-bottom: 3px solid #e94560;
+    }
+
+    .header-banner {
+      position: relative;
+      text-align: center;
+      padding: 36px 20px 20px;
+      min-height: 130px;
+    }
+
+    /* Foto de fondo */
+    .header-bg-photo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 55%;
+      z-index: 0;
+    }
+
+    /* Overlay oscuro sobre la foto */
+    .header-banner::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(15, 20, 40, 0.6) 0%, rgba(15, 52, 96, 0.45) 100%);
+      z-index: 1;
+    }
+
+    /* Título principal */
+    header h1 {
+      font-size: 1.7rem;
+      color: #fff;
+      margin-bottom: 6px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    header p {
+      font-size: 0.9rem;
+      color: #ccc;
+      position: relative;
+      z-index: 2;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Logo Magic Brain en esquina superior derecha */
+    .header-logo {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      z-index: 3;
+    }
+
+    .header-logo a {
+      display: flex;
+      align-items: center;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+
+    .header-logo a:hover {
+      opacity: 1;
+    }
+
+    .header-logo img {
+      height: 38px;
+      width: auto;
+    }
+
+    @media print {
+
+      .header-logo,
+      .header-bg-photo {
+        display: none;
+      }
+    }
+
+    .main-nav {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .nav-btn {
+      padding: 10px 28px;
+      background: transparent;
+      color: #a0a0b0;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .nav-btn:hover {
+      color: #fff;
+    }
+
+    .nav-btn.active {
+      color: #e94560;
+      border-bottom-color: #e94560;
+    }
+
+    /* ── Secciones ───────────────────────────────── */
+    .app-section {
+      display: none;
+    }
+
+    .app-section.active {
+      display: block;
+    }
+
+    .section-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    /* ── Controles de acordes ────────────────────── */
+    .text-input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .text-input-row input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 1.1rem;
+      border: 2px solid #333;
+      border-radius: 8px;
+      background: #16213e;
+      color: #fff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .text-input-row input:focus {
+      border-color: #e94560;
+    }
+
+    .text-input-row button,
+    .btn-primary {
+      padding: 12px 24px;
+      font-size: 1rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    .text-input-row button:hover,
+    .btn-primary:hover {
+      background: #c73652;
+    }
+
+    /* Selector visual */
+    .visual-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 14px;
+      background: #16213e;
+      border-radius: 8px;
+      border: 1px solid #333;
+      margin-bottom: 16px;
+    }
+
+    .visual-selector label {
+      font-size: 0.8rem;
+      color: #a0a0b0;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .visual-selector select {
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      background: #1a1a2e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .sel-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ext-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ext-group .ext-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .ext-option {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+
+    .ext-option input {
+      accent-color: #e94560;
+    }
+
+    /* Sub-tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #333;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      background: transparent;
+      color: #a0a0b0;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      color: #e94560;
+      border-bottom-color: #e94560;
+    }
+
+    .bank-count {
+      display: none;
+      background: #e94560;
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* Sort + info */
+    .sort-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+
+    .sort-controls {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sort-row select {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #16213e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    #chord-info {
+      padding: 10px 16px;
+      background: #0f3460;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      min-height: 38px;
+      flex: 1;
+    }
+
+    #chord-info .notes {
+      color: #e94560;
+      font-weight: bold;
+    }
+
+    #chord-info .error {
+      color: #ff6b6b;
+    }
+
+    /* Scale section */
+    .scale-section {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #0d1b36;
+      border: 1px solid #4ecdc4;
+      border-radius: 6px;
+    }
+
+    .scale-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .scale-label {
+      font-size: 0.9rem;
+      color: #4ecdc4;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    #scale-select {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #16213e;
+      color: #fff;
+      border: 1px solid #4ecdc4;
+      border-radius: 6px;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .scale-notes {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: #a0a0b0;
+    }
+
+    .scale-notes .note {
+      display: inline-block;
+      padding: 2px 6px;
+      margin: 2px;
+      background: rgba(78, 205, 196, 0.15);
+      border-radius: 4px;
+      color: #4ecdc4;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    .scale-notes .note.chord-tone {
+      background: rgba(78, 205, 196, 0.35);
+      border: 1px solid #4ecdc4;
+    }
+
+    /* Manual input */
+    .manual-section {
+      display: none;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      padding: 14px;
+      background: #16213e;
+      border-radius: 8px;
+      border: 1px solid #333;
+      margin-bottom: 14px;
+    }
+
+    .manual-section label {
+      font-size: 0.75rem;
+      color: #a0a0b0;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .manual-section .manual-name-group {
+      flex: 0 0 auto;
+    }
+
+    .manual-section input[type="text"] {
+      width: 80px;
+      padding: 7px 8px;
+      font-size: 0.9rem;
+      background: #1a1a2e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .manual-section .name-input {
+      width: 120px;
+      text-align: left;
+    }
+
+    .manual-section .fret-inputs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .manual-section .fret-inputs input {
+      width: 36px;
+    }
+
+    .manual-section .string-label {
+      font-size: 0.65rem;
+      color: #777;
+      text-align: center;
+    }
+
+    .btn-small {
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .btn-small:hover {
+      background: #c73652;
+    }
+
+    .btn-secondary {
+      background: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #444;
+    }
+
+    .btn-danger {
+      background: #8b0000;
+    }
+
+    .btn-danger:hover {
+      background: #a00;
+    }
+
+    .bank-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+      align-items: flex-end;
+    }
+
+    /* ── Grid de resultados ──────────────────────── */
+    #results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+    }
+
+    .voicing-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+
+    .voicing-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .voicing-card.personal {
+      border: 2px solid #e94560;
+    }
+
+    .voicing-card.pinned {
+      border: 2px solid #4ecdc4;
+    }
+
+    .voicing-card.highlight {
+      border: 2px solid #ffe66d;
+      box-shadow: 0 0 16px rgba(255, 230, 109, 0.5);
+    }
+
+    .voicing-card svg {
+      width: 100%;
+      height: auto;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-top: 4px;
+    }
+
+    .btn-card-action {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 8px;
+      transition: all 0.15s;
+      color: #999;
+    }
+
+    .btn-save:hover,
+    .btn-save.saved {
+      color: #e94560;
+      border-color: #e94560;
+    }
+
+    .btn-delete:hover {
+      color: #c00;
+      border-color: #c00;
+    }
+
+    .bank-group-header {
+      grid-column: 1 / -1;
+      padding: 8px 12px;
+      background: #0f3460;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #e94560;
+      margin-top: 8px;
+    }
+
+    .bank-group-header:first-child {
+      margin-top: 0;
+    }
+
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: #a0a0b0;
+      padding: 40px;
+      font-size: 1rem;
+    }
+
+    #file-import,
+    #file-import-songs {
+      display: none;
+    }
+
+    /* ── Canciones – Lista ───────────────────────── */
+    .songs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .songs-header h2 {
+      font-size: 1.3rem;
+      color: #fff;
+    }
+
+    .songs-toolbar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .song-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #333;
+      transition: border-color 0.2s;
+    }
+
+    .song-row:hover {
+      border-color: #e94560;
+    }
+
+    .song-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .song-title {
+      font-weight: bold;
+      font-size: 1.05rem;
+      color: #fff;
+    }
+
+    .song-artist {
+      font-size: 0.85rem;
+      color: #a0a0b0;
+    }
+
+    .song-chords-preview {
+      font-size: 0.8rem;
+      color: #e94560;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .song-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+
+    /* ── Editor de canción ────────────────────────── */
+    .editor-fields {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .editor-fields input {
+      padding: 10px 14px;
+      font-size: 1rem;
+      background: #16213e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .editor-fields input:focus {
+      border-color: #e94560;
+    }
+
+    .editor-fields .field-title {
+      flex: 2;
+      min-width: 200px;
+    }
+
+    .editor-fields .field-artist {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .editor-content-area {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .editor-content-area textarea {
+      width: 100%;
+      min-height: 300px;
+      padding: 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      background: #16213e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 8px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.6;
+    }
+
+    .editor-content-area textarea:focus {
+      border-color: #e94560;
+    }
+
+    .editor-preview-box {
+      padding: 14px;
+      background: #0d1b36;
+      border: 1px solid #333;
+      border-radius: 8px;
+      min-height: 300px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .editor-label {
+      font-size: 0.8rem;
+      color: #a0a0b0;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .editor-bottom {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .editor-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Pinned voicings en editor */
+    .pinned-section {
+      margin-top: 14px;
+    }
+
+    .pinned-section h3 {
+      font-size: 0.9rem;
+      color: #a0a0b0;
+      margin-bottom: 8px;
+    }
+
+    #editor-pinned {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      min-height: 60px;
+      padding: 10px;
+      background: #16213e;
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+
+    .pinned-placeholder {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .pinned-card {
+      max-width: 140px;
+    }
+
+    /* ── Vista de canción ─────────────────────────── */
+    .view-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .view-header-info h2 {
+      font-size: 1.4rem;
+      color: #fff;
+    }
+
+    .view-header-info .view-artist {
+      font-size: 0.95rem;
+      color: #a0a0b0;
+    }
+
+    .view-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .view-toolbar button {
+      padding: 6px 12px;
+    }
+
+    .font-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0 !important;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    #view-lyrics {
+      padding: 20px;
+      background: #0d1b36;
+      border-radius: 8px;
+      border: 1px solid #333;
+      min-height: 200px;
+      font-family: 'Courier New', monospace;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+
+    /* Lead sheet styling */
+
+    /* Líneas con letra: acordes flotan arriba */
+    .lyric-line {
+      position: relative;
+      white-space: pre-wrap;
+      padding-top: 1.2em;
+      margin-bottom: 4px;
+      line-height: 1.5;
+    }
+
+    .lyric-text {
+      color: #e0e0e0;
+    }
+
+    .chord-wrap {
+      position: relative;
+      display: inline;
+    }
+
+    .lyric-line .chord-marker {
+      color: #e94560;
+      font-weight: bold;
+      font-size: 0.85em;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      white-space: nowrap;
+      padding-bottom: 1px;
+    }
+
+    /* Líneas de solo acordes: inline con espaciado */
+    .chord-only-line {
+      margin-bottom: 2px;
+      padding-top: 4px;
+      line-height: 1.5;
+    }
+
+    .chord-only-line .chord-marker {
+      color: #e94560;
+      font-weight: bold;
+      font-size: 0.85em;
+      display: inline-block;
+      margin-right: 1.5em;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .chord-marker.clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+    }
+
+    .chord-marker.clickable:hover {
+      color: #ff6b8a;
+    }
+
+    .chord-marker:not(.clickable) {
+      cursor: pointer;
+    }
+
+    .chord-marker:not(.clickable):hover {
+      color: #ffe66d;
+    }
+
+    .preview-placeholder {
+      color: #555;
+      font-style: italic;
+    }
+
+    /* Pinned bar en vista */
+    #view-pinned-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+
+    .pinned-bar-card {
+      width: 130px;
+      flex-shrink: 0;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    /* ── Modal voicing picker ────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: #1a1a2e;
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-header h3 {
+      color: #fff;
+      font-size: 1.1rem;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    #voicing-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .picker-card {
+      cursor: pointer;
+    }
+
+    .picker-card:hover {
+      border-color: #4ecdc4;
+    }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 700px) {
+      header h1 {
+        font-size: 1.2rem;
+      }
+
+      .sort-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .sort-controls {
+        flex-direction: column;
+      }
+
+      .text-input-row {
+        flex-direction: column;
+      }
+
+      .text-input-row button {
+        width: 100%;
+      }
+
+      #results-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+      }
+
+      .manual-section {
+        flex-direction: column;
+      }
+
+      .bank-toolbar {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      .editor-content-area {
+        grid-template-columns: 1fr;
+      }
+
+      .song-row {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .song-actions {
+        margin-left: 0;
+      }
+    }
+
+    /* ── Print / PDF ─────────────────────────────── */
+    @media print {
+      * {
+        color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body {
+        background: #fff;
+        color: #000;
+        min-height: auto;
+      }
+
+      header,
+      .main-nav,
+      .view-toolbar,
+      .modal-overlay {
+        display: none !important;
+      }
+
+      /* Solo mostrar la vista de canción */
+      .app-section {
+        display: none !important;
+      }
+
+      #section-song-view {
+        display: block !important;
+      }
+
+      .section-inner {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+
+      /* Header de la canción */
+      .view-header {
+        margin-bottom: 10px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 8px;
+      }
+
+      .view-header-info h2 {
+        color: #000;
+        font-size: 1.5rem;
+      }
+
+      .view-header-info .view-artist {
+        color: #555;
+        font-size: 1rem;
+      }
+
+      /* Lyrics */
+      #view-lyrics {
+        background: #fff;
+        border: none;
+        padding: 10px 0;
+        margin-bottom: 14px;
+        font-size: 13pt !important;
+        line-height: 1.5;
+      }
+
+      .lyric-line {
+        padding-top: 1.3em;
+        margin-bottom: 3px;
+      }
+
+      .lyric-text {
+        color: #000;
+      }
+
+      .chord-marker,
+      .lyric-line .chord-marker,
+      .chord-only-line .chord-marker {
+        color: #000 !important;
+        font-weight: bold;
+      }
+
+      /* Pinned voicings */
+      #view-pinned-bar {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 8px;
+        gap: 8px;
+        page-break-inside: avoid;
+      }
+
+      .pinned-bar-card {
+        width: 110px;
+      }
+
+      .voicing-card {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        break-inside: avoid;
+      }
+
+      .voicing-card svg text {
+        fill: #000 !important;
+      }
+
+      .voicing-card svg line,
+      .voicing-card svg rect {
+        stroke: #000 !important;
+      }
+
+      .voicing-card svg circle {
+        fill: #000 !important;
+      }
+
+      /* Título de sección voicings */
+      #section-song-view h3 {
+        color: #333 !important;
+      }
+
+      /* Page setup */
+      @page {
+        margin: 15mm;
+        size: A4;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ════ Header + Nav ════ -->
+  <header>
+    <div class="header-banner">
+      <!-- Foto de fondo -->
+      <img src="public/header.jpg" alt="" class="header-bg-photo">
+
+      <!-- Logo Magic Brain esquina superior derecha -->
+      <div class="header-logo">
+        <a href="https://www.magicbrain.com.ar" target="_blank" rel="noopener" title="Magic Brain">
+          <img src="public/Magic_Brain_Transparent_4.png" alt="Magic Brain">
+        </a>
+      </div>
+
+      <h1>Guitar Chord Voicings</h1>
+      <p>Acordes, voicings y cancionero para guitarra</p>
+    </div>
+    <nav class="main-nav">
+      <button class="nav-btn active" id="nav-chords">Acordes</button>
+      <button class="nav-btn" id="nav-songs">Canciones</button>
+    </nav>
+  </header>
+
+  <!-- ════ Seccion: Acordes ════ -->
+  <section class="app-section active" id="section-chords">
+    <div class="section-inner">
+      <div class="text-input-row">
+        <input type="text" id="chord-input" placeholder="Ej: Dm7, Cmaj9, G7#11, Am/G..." autocomplete="off"
+          spellcheck="false">
+        <button id="btn-search">Buscar</button>
+      </div>
+
+      <div class="visual-selector">
+        <div class="sel-group">
+          <label>Raiz</label>
+          <select id="sel-root"></select>
+        </div>
+        <div class="sel-group">
+          <label>Calidad</label>
+          <select id="sel-quality"></select>
+        </div>
+        <div class="ext-group">
+          <label>Extensiones</label>
+          <div class="ext-options">
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="b5">b5</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="#5">#5</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="b9">b9</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="9">9</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="#9">#9</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="11">11</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="#11">#11</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="b13">b13</label>
+            <label class="ext-option"><input type="checkbox" class="ext-checkbox" value="13">13</label>
+          </div>
+        </div>
+        <div class="sel-group">
+          <label>Bajo (slash)</label>
+          <select id="sel-bass"></select>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-generated">Generados</button>
+        <button class="tab-btn" id="tab-bank">Mis Acordes <span class="bank-count" id="bank-count">0</span></button>
+      </div>
+
+      <div class="manual-section" id="manual-section">
+        <div class="manual-name-group">
+          <label>Nombre del acorde</label>
+          <input type="text" id="manual-name" class="name-input" placeholder="Ej: Dm7">
+        </div>
+        <div>
+          <label>Trastes (X = muted)</label>
+          <div class="fret-inputs">
+            <div>
+              <div class="string-label">E</div><input type="text" id="manual-s0" placeholder="x" maxlength="2">
+            </div>
+            <div>
+              <div class="string-label">A</div><input type="text" id="manual-s1" placeholder="x" maxlength="2">
+            </div>
+            <div>
+              <div class="string-label">D</div><input type="text" id="manual-s2" placeholder="0" maxlength="2">
+            </div>
+            <div>
+              <div class="string-label">G</div><input type="text" id="manual-s3" placeholder="2" maxlength="2">
+            </div>
+            <div>
+              <div class="string-label">B</div><input type="text" id="manual-s4" placeholder="1" maxlength="2">
+            </div>
+            <div>
+              <div class="string-label">e</div><input type="text" id="manual-s5" placeholder="1" maxlength="2">
+            </div>
+          </div>
+        </div>
+        <button class="btn-small" id="btn-manual-save">Guardar</button>
+        <div class="bank-toolbar">
+          <button class="btn-small btn-secondary" id="btn-export">Exportar JSON</button>
+          <button class="btn-small btn-secondary" id="btn-import">Importar JSON</button>
+          <input type="file" id="file-import" accept=".json">
+        </div>
+      </div>
+
+      <div class="bank-search" id="bank-search" style="display:none; margin-bottom:12px;">
+        <input type="text" id="bank-search-input" placeholder="Buscar en mis acordes... (ej: Dm7, Am, G)"
+          autocomplete="off" spellcheck="false"
+          style="width:100%; padding:10px 14px; font-size:1rem; background:#16213e; color:#fff; border:1px solid #444; border-radius:6px; outline:none;">
+      </div>
+
+      <div class="sort-row">
+        <div id="chord-info"></div>
+        <div class="sort-controls">
+          <select id="position-filter">
+            <option value="all">Todas las posiciones</option>
+            <option value="0-4">Posicion 1 (trastes 0-4)</option>
+            <option value="5-8">Posicion 2 (trastes 5-8)</option>
+            <option value="9-12">Posicion 3 (trastes 9-12)</option>
+            <option value="13-15">Posicion 4 (trastes 13-15)</option>
+          </select>
+          <select id="sort-select">
+            <option value="score">Ordenar: Popularidad</option>
+            <option value="position">Ordenar: Posicion</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="scale-section" class="scale-section" style="display:none;">
+        <div class="scale-row">
+          <label class="scale-label">Escalas compatibles:</label>
+          <select id="scale-select">
+            <option value="">Sin escala</option>
+          </select>
+        </div>
+        <div id="scale-notes" class="scale-notes"></div>
+      </div>
+
+    </div>
+    <div id="results-grid"></div>
+  </section>
+
+  <!-- ════ Seccion: Lista de Canciones ════ -->
+  <section class="app-section" id="section-songs">
+    <div class="section-inner">
+      <div class="songs-header">
+        <h2>Mis Canciones</h2>
+        <div class="songs-toolbar">
+          <button class="btn-primary" id="btn-new-song">+ Nueva Cancion</button>
+          <button class="btn-small btn-secondary" id="btn-export-songs">Exportar</button>
+          <button class="btn-small btn-secondary" id="btn-import-songs">Importar</button>
+          <input type="file" id="file-import-songs" accept=".json">
+        </div>
+      </div>
+      <div id="songs-list"></div>
+    </div>
+  </section>
+
+  <!-- ════ Seccion: Editor de Canción ════ -->
+  <section class="app-section" id="section-song-edit">
+    <div class="section-inner">
+      <div class="editor-fields">
+        <input type="text" id="editor-title" class="field-title" placeholder="Titulo de la cancion">
+        <input type="text" id="editor-artist" class="field-artist" placeholder="Artista (opcional)">
+      </div>
+
+      <div class="editor-content-area">
+        <div>
+          <span class="editor-label">Letra con acordes entre [corchetes]:</span>
+          <textarea id="editor-content"
+            placeholder="[Em7b5]The song [A7b9]is you&#10;[Dm7]The beautiful [G7]song is you&#10;&#10;Escribe los acordes entre [corchetes] antes de cada silaba."></textarea>
+        </div>
+        <div>
+          <span class="editor-label">Preview:</span>
+          <div class="editor-preview-box" id="editor-preview"></div>
+        </div>
+      </div>
+
+      <div class="pinned-section">
+        <h3>Voicings de referencia (click en un acorde del preview para agregar)</h3>
+        <div id="editor-pinned"></div>
+      </div>
+
+      <div class="editor-bottom">
+        <div class="editor-buttons">
+          <button class="btn-primary" id="btn-editor-save">Guardar Cancion</button>
+          <button class="btn-small btn-secondary" id="btn-editor-cancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ Seccion: Vista de Canción ════ -->
+  <section class="app-section" id="section-song-view">
+    <div class="section-inner">
+      <div class="view-header">
+        <div class="view-header-info">
+          <h2 id="view-title"></h2>
+          <span class="view-artist" id="view-artist"></span>
+        </div>
+        <div class="view-toolbar">
+          <button class="btn-small font-btn" id="btn-font-down">A-</button>
+          <button class="btn-small font-btn" id="btn-font-up">A+</button>
+          <button class="btn-small btn-secondary" id="btn-view-print">Imprimir PDF</button>
+          <button class="btn-small btn-secondary" id="btn-view-edit">Editar</button>
+          <button class="btn-small btn-secondary" id="btn-view-back">Volver</button>
+        </div>
+      </div>
+
+      <div id="view-lyrics"></div>
+
+      <h3 style="color:#a0a0b0; font-size:0.9rem; margin:14px 0 8px;">Voicings de referencia (click en un acorde de la
+        letra para resaltar)</h3>
+      <div id="view-pinned-bar"></div>
+    </div>
+  </section>
+
+  <!-- ════ Modal: Voicing Picker ════ -->
+  <div class="modal-overlay" id="voicing-picker-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="voicing-picker-title">Elegir voicing</h3>
+        <button class="modal-close" id="voicing-picker-close">&times;</button>
+      </div>
+      <div id="voicing-picker-grid"></div>
+    </div>
+  </div>
+
+  <!-- ════ Scripts ════ -->
+  <script src="js/music-theory.js"></script>
+  <script src="js/chord-parser.js"></script>
+  <script src="js/voicing-finder.js"></script>
+  <script src="js/fretboard-svg.js"></script>
+  <script src="js/scale-detector.js"></script>
+  <script src="js/chord-bank.js"></script>
+  <script src="js/songbook.js"></script>
+  <script src="js/song-editor.js"></script>
+  <script src="js/song-view.js"></script>
+  <script src="js/ui.js"></script>
+
+  <!-- Service Worker para PWA offline -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    }
+  </script>
+</body>
+
+</html>
