@@ -203,6 +203,15 @@
     // Detectar barré
     const barre = detectBarre(frets);
 
+    // Rechazar voicings anatómicamente imposibles:
+    // Si hay cejilla, ninguna cuerda dentro del rango puede tener un traste
+    // menor que la cejilla (incluyendo traste 0 / al aire)
+    if (barre) {
+      for (let s = barre.fromString; s <= barre.toString; s++) {
+        if (frets[s] >= 0 && frets[s] < barre.fret) return null;
+      }
+    }
+
     // Sugerir dedos
     const fingers = suggestFingers(frets, barre);
 
