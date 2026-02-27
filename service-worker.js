@@ -2,7 +2,7 @@
 // service-worker.js  –  Cache offline para Guitar App PWA
 // ============================================================
 
-const CACHE_NAME = 'guitar-app-v1';
+const CACHE_NAME = 'guitar-app-v2';
 
 const ASSETS = [
   './',
@@ -19,6 +19,8 @@ const ASSETS = [
   './js/song-editor.js',
   './js/song-view.js',
   './js/ui.js',
+  './public/header.jpg',
+  './public/Magic_Brain_Transparent_4.png',
 ];
 
 // Instalar: cachear todos los assets
