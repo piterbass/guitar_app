@@ -121,5 +121,50 @@
     return results;
   }
 
-  window.ScaleDetector = { findCompatibleScales, SCALE_LABELS };
+  /**
+   * Versión mejorada de findCompatibleScales con scoring por relevancia musical.
+   * Ordena por: coincidencia de raíz, tensiones válidas, y penaliza avoid notes.
+   */
+  function scoredCompatibleScales(chordPCs, chordRootPc, chordIntervals) {
+    const results = findCompatibleScales(chordPCs, chordRootPc);
+    if (!chordIntervals) return results;
+
+    const { INTERVAL_SEMITONES } = window.MusicTheory;
+    const chordSet = new Set(chordPCs);
+
+    // Encontrar la 3ra del acorde para detectar avoid notes
+    const thirdSemitones = chordIntervals.includes('3') ? 4
+      : chordIntervals.includes('b3') ? 3 : null;
+    const thirdPc = thirdSemitones !== null ? (chordRootPc + thirdSemitones) % 12 : null;
+
+    for (const scale of results) {
+      const scaleSet = new Set(scale.scalePCs);
+      let fitScore = chordPCs.length * 10;
+
+      // Bonus raíz coincidente
+      if (scale.root === chordRootPc) fitScore += 20;
+
+      // Bonus por tensiones válidas disponibles en la escala
+      const tensionIntervals = ['9', 'b9', '#9', '11', '#11', 'b13', '13'];
+      for (const ti of tensionIntervals) {
+        if (INTERVAL_SEMITONES[ti] === undefined) continue;
+        const tensionPc = (chordRootPc + INTERVAL_SEMITONES[ti]) % 12;
+        if (scaleSet.has(tensionPc) && !chordSet.has(tensionPc)) fitScore += 3;
+      }
+
+      // Penalizar avoid notes (semitono por encima de raíz o 3ra)
+      const avoidChecks = [(chordRootPc + 1) % 12];
+      if (thirdPc !== null) avoidChecks.push((thirdPc + 1) % 12);
+      for (const avoid of avoidChecks) {
+        if (scaleSet.has(avoid) && !chordSet.has(avoid)) fitScore -= 5;
+      }
+
+      scale.fitScore = fitScore;
+    }
+
+    results.sort((a, b) => b.fitScore - a.fitScore);
+    return results;
+  }
+
+  window.ScaleDetector = { findCompatibleScales, scoredCompatibleScales, SCALE_LABELS };
 })();

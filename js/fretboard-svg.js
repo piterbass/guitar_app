@@ -224,9 +224,10 @@
    * @param {SVGElement} svg – el SVG del diagrama
    * @param {object} voicing – el voicing del acorde
    * @param {number[]} scalePCs – pitch classes de la escala
-   * @param {number[]} chordPCs – pitch classes del acorde (para distinguir tonos del acorde)
+   * @param {number[]} chordPCs – pitch classes del acorde
+   * @param {object} [targetOpts] – { targetPCs, tensionPCs, avoidPCs } (Sets)
    */
-  function addScaleOverlay(svg, voicing, scalePCs, chordPCs) {
+  function addScaleOverlay(svg, voicing, scalePCs, chordPCs, targetOpts) {
     // Limpiar overlay previo
     svg.querySelectorAll('.scale-overlay').forEach(el => el.remove());
 
@@ -259,18 +260,36 @@
     const group = svgEl('g', {});
     group.classList.add('scale-overlay');
 
+    // Helper para determinar color/estilo según jerarquía
+    function getNoteStyle(pc, isChordPos) {
+      const isTarget = targetOpts && targetOpts.targetPCs && targetOpts.targetPCs.has(pc);
+      const isTension = targetOpts && targetOpts.tensionPCs && targetOpts.tensionPCs.has(pc);
+      const isAvoid = targetOpts && targetOpts.avoidPCs && targetOpts.avoidPCs.has(pc);
+      const isChordTone = chordSet.has(pc);
+
+      if (isChordPos) {
+        // Nota del voicing: anillo
+        return { ring: true, color: isTarget ? '#ffe66d' : '#4ecdc4', width: isTarget ? 3 : 2.5 };
+      }
+      if (isTarget) return { fill: '#ffe66d', opacity: 0.85, r: 6, textFill: '#333' };
+      if (isChordTone) return { fill: '#4ecdc4', opacity: 0.8, r: 5, textFill: '#fff' };
+      if (isTension) return { fill: '#ff9f43', opacity: 0.65, r: 5, textFill: '#fff' };
+      if (isAvoid) return { fill: '#ff6b6b', opacity: 0.3, r: 4, textFill: '#fff' };
+      return { fill: '#4ecdc4', opacity: 0.45, r: 5, textFill: '#fff' };
+    }
+
     // Recorrer cuerdas y trastes visibles
     for (let s = 0; s < NUM_STRINGS; s++) {
       const x = CFG.padLeft + s * CFG.stringSpacing;
 
-      // Traste 0 (cuerda al aire) - solo si estamos en posición abierta
+      // Traste 0 (cuerda al aire)
       if (startFret === 1) {
         const pc = fretToPC(s, 0);
         if (scaleSet.has(pc) && !chordPositions.has(s + ',0')) {
-          // Punto de escala en la zona de cuerdas al aire
+          const st = getNoteStyle(pc, false);
           group.appendChild(svgEl('circle', {
             cx: x, cy: CFG.padTop - 12,
-            r: 4, fill: '#4ecdc4', opacity: 0.7,
+            r: Math.min(st.r, 4), fill: st.fill, opacity: st.opacity,
           }));
         }
       }
@@ -281,28 +300,26 @@
 
         const y = CFG.padTop + (fret - startFret + 0.5) * CFG.fretSpacing;
         const isChordPos = chordPositions.has(s + ',' + fret);
+        const st = getNoteStyle(pc, isChordPos);
 
-        if (isChordPos) {
-          // Nota del acorde: anillo teal alrededor
+        if (st.ring) {
+          // Nota del voicing: anillo alrededor
           group.appendChild(svgEl('circle', {
             cx: x, cy: y,
             r: CFG.dotRadius + 3,
-            fill: 'none', stroke: '#4ecdc4', 'stroke-width': 2.5,
+            fill: 'none', stroke: st.color, 'stroke-width': st.width,
           }));
         } else {
-          // Nota de escala (no del acorde): punto teal semitransparente
-          const isChordTone = chordSet.has(pc);
+          // Nota de escala: punto coloreado
           group.appendChild(svgEl('circle', {
-            cx: x, cy: y,
-            r: 5,
-            fill: isChordTone ? '#4ecdc4' : '#4ecdc4',
-            opacity: isChordTone ? 0.8 : 0.45,
+            cx: x, cy: y, r: st.r,
+            fill: st.fill, opacity: st.opacity,
           }));
-          // Nombre de la nota dentro del punto
+          // Nombre de la nota
           const noteText = svgEl('text', {
             x: x, y: y + 3,
             'text-anchor': 'middle', 'font-size': 7, 'font-weight': 'bold',
-            fill: '#fff', opacity: isChordTone ? 1 : 0.9,
+            fill: st.textFill, opacity: st.opacity > 0.5 ? 1 : 0.7,
           });
           noteText.classList.add('scale-overlay');
           noteText.textContent = window.MusicTheory.pcToName(pc);

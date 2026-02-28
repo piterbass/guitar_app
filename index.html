@@ -401,6 +401,72 @@
       border: 1px solid #4ecdc4;
     }
 
+    .scale-notes .note.target-note {
+      background: rgba(255, 230, 109, 0.35);
+      border: 1px solid #ffe66d;
+      color: #ffe66d;
+    }
+
+    .scale-notes .note.tension-note {
+      background: rgba(255, 159, 67, 0.25);
+      border: 1px solid #ff9f43;
+      color: #ff9f43;
+    }
+
+    .scale-notes .note.avoid-note {
+      background: rgba(255, 107, 107, 0.15);
+      border: 1px solid rgba(255, 107, 107, 0.4);
+      color: #ff6b6b;
+      opacity: 0.7;
+    }
+
+    .scale-mode-toggle {
+      display: flex;
+      gap: 0;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #4ecdc4;
+      flex-shrink: 0;
+    }
+
+    .scale-mode-btn {
+      padding: 4px 12px;
+      background: transparent;
+      color: #4ecdc4;
+      border: none;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .scale-mode-btn.active {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+
+    #harmonic-function {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #16213e;
+      color: #fff;
+      border: 1px solid #ff9f43;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .target-toggle {
+      font-size: 0.8rem;
+      color: #ffe66d;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .target-toggle input {
+      accent-color: #ffe66d;
+    }
+
     /* Manual input */
     .manual-section {
       display: none;
@@ -1000,6 +1066,11 @@
         flex-direction: column;
       }
 
+      .scale-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
       .text-input-row {
         flex-direction: column;
       }
@@ -1275,6 +1346,15 @@
       <div class="sort-row">
         <div id="chord-info"></div>
         <div class="sort-controls">
+          <select id="voicing-category">
+            <option value="common">Voicings: Comunes</option>
+            <option value="shell">Shell voicings</option>
+            <option value="rootless">Rootless</option>
+            <option value="quartal">Cuartales</option>
+            <option value="drop2">Drop 2</option>
+            <option value="cluster">Clusters / Tensiones</option>
+            <option value="spread">Abiertos (spread)</option>
+          </select>
           <select id="position-filter">
             <option value="all">Todas las posiciones</option>
             <option value="0-4">Posicion 1 (trastes 0-4)</option>
@@ -1291,10 +1371,26 @@
 
       <div id="scale-section" class="scale-section" style="display:none;">
         <div class="scale-row">
-          <label class="scale-label">Escalas compatibles:</label>
+          <label class="scale-label">Escalas:</label>
+          <div class="scale-mode-toggle" id="scale-mode-toggle">
+            <button class="scale-mode-btn active" data-mode="compatible">Compatible</button>
+            <button class="scale-mode-btn" data-mode="contextual">Contextual</button>
+          </div>
+          <select id="harmonic-function" style="display:none;">
+            <option value="tonica">Tonica</option>
+            <option value="subdominante">Subdominante</option>
+            <option value="dominante">Dominante</option>
+            <option value="modal">Modal</option>
+            <option value="secundario">Secundario</option>
+          </select>
           <select id="scale-select">
             <option value="">Sin escala</option>
           </select>
+        </div>
+        <div class="scale-row" style="margin-top:6px;">
+          <label class="target-toggle">
+            <input type="checkbox" id="show-targets" checked> Target notes
+          </label>
         </div>
         <div id="scale-notes" class="scale-notes"></div>
       </div>
@@ -1395,6 +1491,7 @@
   <script src="js/voicing-finder.js"></script>
   <script src="js/fretboard-svg.js"></script>
   <script src="js/scale-detector.js"></script>
+  <script src="js/harmonic-context.js"></script>
   <script src="js/chord-bank.js"></script>
   <script src="js/songbook.js"></script>
   <script src="js/song-editor.js"></script>

@@ -26,6 +26,7 @@
     const filterMin = typeof options.minFret === 'number' ? options.minFret : null;
     const filterMax = typeof options.maxFret === 'number' ? options.maxFret : null;
     const hasFilter = filterMin !== null;
+    const category = options.category || 'common';
 
     const targetPCs = new Set(chord.pitchClasses);
     const results = [];
@@ -47,7 +48,7 @@
       if (results.length >= SEARCH_LIMIT) return;
 
       if (stringIdx === NUM_STRINGS) {
-        const v = validateAndScore(voicing, chord, hasFilter, filterMin, filterMax);
+        const v = validateAndScore(voicing, chord, hasFilter, filterMin, filterMax, category);
         if (v) results.push(v);
         return;
       }
@@ -99,12 +100,13 @@
   /**
    * Valida un voicing completo y calcula su score.
    */
-  function validateAndScore(frets, chord, hasFilter, filterMin, filterMax) {
+  function validateAndScore(frets, chord, hasFilter, filterMin, filterMax, category) {
     const targetPCs = chord.pitchClasses;
 
     // Recolectar notas tocadas
     const playedPCs = [];
     const playedFrets = [];
+    const midiNotes = [];
     let lowestNote = null;
 
     for (let str = 0; str < NUM_STRINGS; str++) {
@@ -112,6 +114,7 @@
       const pc = fretToPC(str, frets[str]);
       playedPCs.push(pc);
       playedFrets.push(frets[str]);
+      midiNotes.push(STANDARD_TUNING[str] + frets[str]);
       if (lowestNote === null) {
         lowestNote = { pc, midi: STANDARD_TUNING[str] + frets[str] };
       }
@@ -176,29 +179,38 @@
       if (position < filterMin || position > filterMax) return null;
     }
 
-    // Calcular score
-    let score = 0;
-
-    // +20 por cada nota del acorde cubierta
-    score += coverage * 20;
-
-    // +15 si la raíz está en el bajo
-    if (lowestNote && lowestNote.pc === chord.rootPc) score += 15;
-
-    // +10 si incluye la raíz
-    if (uniquePlayed.has(chord.rootPc)) score += 10;
-
-    // Preferir posiciones bajas (solo cuando no hay filtro de posición)
-    if (!hasFilter) {
-      const avgFret = playedFrets.reduce((a, b) => a + b, 0) / playedFrets.length;
-      score += Math.max(0, 15 - avgFret);
+    // Computar datos para scoring por categoría
+    const adjacentIntervals = [];
+    for (let i = 1; i < midiNotes.length; i++) {
+      adjacentIntervals.push(midiNotes[i] - midiNotes[i - 1]);
     }
 
-    // Preferir más cuerdas tocadas
-    score += playedPCs.length * 5;
+    const chordIntervals = chord.intervals || [];
+    const thirdPc = chordIntervals.includes('3')
+      ? (chord.rootPc + 4) % 12
+      : chordIntervals.includes('b3')
+        ? (chord.rootPc + 3) % 12
+        : null;
+    const seventhPc = chordIntervals.includes('7')
+      ? (chord.rootPc + 11) % 12
+      : chordIntervals.includes('b7')
+        ? (chord.rootPc + 10) % 12
+        : chordIntervals.includes('bb7')
+          ? (chord.rootPc + 9) % 12
+          : null;
+    const has3rd = thirdPc !== null && uniquePlayed.has(thirdPc);
+    const has7th = seventhPc !== null && uniquePlayed.has(seventhPc);
 
-    // Preferir menor span
-    score += (4 - span) * 3;
+    const rootInBass = !!(lowestNote && lowestNote.pc === chord.rootPc);
+    const hasRoot = uniquePlayed.has(chord.rootPc);
+    const avgFret = playedFrets.reduce((a, b) => a + b, 0) / playedFrets.length;
+
+    // Calcular score según categoría
+    const score = scoreByCategory(category, {
+      coverage, rootInBass, hasRoot, avgFret,
+      stringCount: playedPCs.length, span, adjacentIntervals,
+      has3rd, has7th, hasFilter, uniquePCCount: uniquePlayed.size,
+    });
 
     // Detectar barré
     const barre = detectBarre(frets);
@@ -225,6 +237,100 @@
       span,
       position,
     };
+  }
+
+  /**
+   * Calcula score según la categoría de voicing seleccionada.
+   */
+  function scoreByCategory(cat, d) {
+    switch (cat) {
+      case 'shell': {
+        // Shell voicings: requiere 3ra y 7ma, pocas cuerdas
+        if (!d.has3rd || !d.has7th) return -100;
+        let s = 40;
+        if (d.hasRoot) s += 5;
+        s += d.stringCount <= 4 ? 20 : -(d.stringCount - 4) * 10;
+        s += (4 - d.span) * 3;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      case 'rootless': {
+        // Sin fundamental: penaliza presencia de raíz
+        let s = d.coverage * 15;
+        if (d.hasRoot) s -= 30;
+        if (d.rootInBass) s -= 50;
+        if (d.has3rd) s += 15;
+        if (d.has7th) s += 15;
+        s += d.stringCount * 3;
+        s += (4 - d.span) * 3;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      case 'quartal': {
+        // Voicings cuartales: premia intervalos de 4ta justa
+        let s = d.coverage * 10;
+        for (const iv of d.adjacentIntervals) {
+          if (iv === 5) s += 15;           // 4ta justa
+          else if (iv === 6) s += 8;       // tritono
+          else if (iv === 4 || iv === 7) s += 3; // 3ra mayor / 5ta justa
+          else s -= 5;
+        }
+        s += d.stringCount * 3;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      case 'drop2': {
+        // Drop 2: gap grande en bajo, voces cercanas arriba, 4 cuerdas ideal
+        let s = d.coverage * 10;
+        s -= Math.abs(d.stringCount - 4) * 10;
+        if (d.adjacentIntervals.length >= 3) {
+          const bottomGap = d.adjacentIntervals[0];
+          const upperIntervals = d.adjacentIntervals.slice(1);
+          const upperAvg = upperIntervals.reduce((a, b) => a + b, 0) / upperIntervals.length;
+          if (bottomGap >= 7 && upperAvg <= 5) s += 25;
+          else if (bottomGap >= 5) s += 10;
+        }
+        if (d.has3rd) s += 10;
+        if (d.has7th) s += 10;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      case 'cluster': {
+        // Clusters / tensiones: intervalos chicos, premia más PCs únicos
+        let s = d.coverage * 10;
+        for (const iv of d.adjacentIntervals) {
+          if (iv <= 2) s += 12;
+          else if (iv <= 4) s += 6;
+          else s -= 3;
+        }
+        s += Math.max(0, d.uniquePCCount - 3) * 8;
+        s += d.stringCount * 3;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      case 'spread': {
+        // Voicings abiertos: intervalos amplios
+        let s = d.coverage * 10;
+        for (const iv of d.adjacentIntervals) {
+          if (iv >= 7) s += 12;
+          else if (iv >= 5) s += 6;
+          else s -= 5;
+        }
+        s += d.stringCount * 2;
+        if (!d.hasFilter) s += Math.max(0, 10 - d.avgFret);
+        return s;
+      }
+      default: {
+        // common: scoring original
+        let s = d.coverage * 20;
+        if (d.rootInBass) s += 15;
+        if (d.hasRoot) s += 10;
+        if (!d.hasFilter) s += Math.max(0, 15 - d.avgFret);
+        s += d.stringCount * 5;
+        s += (4 - d.span) * 3;
+        return s;
+      }
+    }
   }
 
   /**

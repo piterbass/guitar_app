@@ -11,17 +11,22 @@
   const SB = window.Songbook;
 
   // Elementos del DOM
-  let elInput, elBtnSearch, elGrid, elInfo, elSortSelect, elPositionFilter;
+  let elInput, elBtnSearch, elGrid, elInfo, elSortSelect, elPositionFilter, elVoicingCategory;
   let elRoot, elQuality, elBass;
   let elExtensions;
   let elTabGen, elTabBank, elManualSection, elBankSearch, elBankSearchInput;
   let elScaleSection, elScaleSelect, elScaleNotes;
+  let elScaleModeToggle, elHarmonicFunction, elShowTargets;
   let syncLock = false;
   let currentTab = 'generated';
 
-  // Estado de escala actual
+  // Estado
+  let currentChord = null;
   let currentChordPCs = null;
   let currentScales = [];
+  let scaleMode = 'compatible';
+  let harmonicFunction = 'tonica';
+  let showTargets = true;
 
   // ── Navegación principal ────────────────────────────────────
 
@@ -48,6 +53,7 @@
     elInfo = document.getElementById('chord-info');
     elSortSelect = document.getElementById('sort-select');
     elPositionFilter = document.getElementById('position-filter');
+    elVoicingCategory = document.getElementById('voicing-category');
     elRoot = document.getElementById('sel-root');
     elQuality = document.getElementById('sel-quality');
     elBass = document.getElementById('sel-bass');
@@ -60,6 +66,9 @@
     elScaleSection = document.getElementById('scale-section');
     elScaleSelect = document.getElementById('scale-select');
     elScaleNotes = document.getElementById('scale-notes');
+    elScaleModeToggle = document.getElementById('scale-mode-toggle');
+    elHarmonicFunction = document.getElementById('harmonic-function');
+    elShowTargets = document.getElementById('show-targets');
 
     populateSelectors();
 
@@ -72,7 +81,31 @@
     elPositionFilter.addEventListener('change', () => {
       if (currentTab === 'generated') doSearch();
     });
+    elVoicingCategory.addEventListener('change', () => {
+      if (currentTab === 'generated') doSearch();
+    });
     elScaleSelect.addEventListener('change', applyScaleOverlay);
+
+    // Scale mode toggle
+    elScaleModeToggle.querySelectorAll('.scale-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        elScaleModeToggle.querySelectorAll('.scale-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        scaleMode = btn.dataset.mode;
+        elHarmonicFunction.style.display = scaleMode === 'contextual' ? '' : 'none';
+        populateScaleSelect();
+        applyScaleOverlay();
+      });
+    });
+    elHarmonicFunction.addEventListener('change', () => {
+      harmonicFunction = elHarmonicFunction.value;
+      populateScaleSelect();
+      applyScaleOverlay();
+    });
+    elShowTargets.addEventListener('change', () => {
+      showTargets = elShowTargets.checked;
+      applyScaleOverlay();
+    });
 
     // Sync texto ↔ selectores
     elInput.addEventListener('input', () => {
@@ -238,6 +271,7 @@
       voicingOpts.maxFret = parseInt(parts[1], 10);
     }
 
+    voicingOpts.category = elVoicingCategory.value;
     let voicings = findVoicings(chord, voicingOpts);
     const sortBy = elSortSelect.value;
     if (sortBy === 'position') voicings.sort((a, b) => a.position - b.position);
@@ -253,8 +287,9 @@
     }
 
     // Detectar escalas compatibles
+    currentChord = chord;
     currentChordPCs = chord.pitchClasses;
-    currentScales = window.ScaleDetector.findCompatibleScales(chord.pitchClasses, chord.rootPc);
+    currentScales = window.ScaleDetector.scoredCompatibleScales(chord.pitchClasses, chord.rootPc, chord.intervals);
     populateScaleSelect();
     elScaleSection.style.display = currentScales.length > 0 ? 'block' : 'none';
 
@@ -267,16 +302,77 @@
   function populateScaleSelect() {
     const prevValue = elScaleSelect.value;
     elScaleSelect.innerHTML = '<option value="">Sin escala</option>';
-    currentScales.forEach((scale, idx) => {
-      const opt = document.createElement('option');
-      opt.value = idx;
-      opt.textContent = scale.label;
-      elScaleSelect.appendChild(opt);
-    });
-    // Restaurar selección previa si la escala sigue disponible
+
+    if (scaleMode === 'contextual' && currentChord && window.HarmonicContext) {
+      const categorized = window.HarmonicContext.categorizeByFunction(
+        currentScales, harmonicFunction, currentChord.quality, currentChord.rootPc
+      );
+
+      const addGroup = (label, scales) => {
+        if (scales.length === 0) return;
+        const grp = document.createElement('optgroup');
+        grp.label = label;
+        scales.forEach(scale => {
+          const opt = document.createElement('option');
+          opt.value = currentScales.indexOf(scale);
+          opt.textContent = scale.label;
+          grp.appendChild(opt);
+        });
+        elScaleSelect.appendChild(grp);
+      };
+
+      addGroup('Recomendadas', categorized.recommended);
+      addGroup('Alternativas', categorized.alternatives);
+      addGroup('Outside', categorized.outside);
+    } else {
+      currentScales.forEach((scale, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = scale.label;
+        elScaleSelect.appendChild(opt);
+      });
+    }
+
     if (prevValue && currentScales[prevValue]) {
       elScaleSelect.value = prevValue;
     }
+  }
+
+  function computeTargetOpts(chord, scalePCs) {
+    if (!chord || !chord.intervals || !scalePCs) return null;
+
+    const { INTERVAL_SEMITONES } = window.MusicTheory;
+    const scaleSet = new Set(scalePCs);
+    const chordSet = new Set(chord.pitchClasses);
+
+    // Guide tones: 3ra y 7ma
+    const targetPCs = new Set();
+    const guideSemitones = { '3': 4, 'b3': 3, '7': 11, 'b7': 10, 'bb7': 9 };
+    for (const [iv, semi] of Object.entries(guideSemitones)) {
+      if (chord.intervals.includes(iv)) {
+        targetPCs.add((chord.rootPc + semi) % 12);
+      }
+    }
+
+    // Tensiones: notas de la escala que son 9/11/13 y NO están en el acorde
+    const tensionPCs = new Set();
+    const tensionIntervals = ['9', 'b9', '#9', '11', '#11', 'b13', '13'];
+    for (const ti of tensionIntervals) {
+      if (INTERVAL_SEMITONES[ti] === undefined) continue;
+      const pc = (chord.rootPc + INTERVAL_SEMITONES[ti]) % 12;
+      if (scaleSet.has(pc) && !chordSet.has(pc)) tensionPCs.add(pc);
+    }
+
+    // Avoid notes: nota a semitono de un chord tone que no es ni chord tone ni tensión
+    const avoidPCs = new Set();
+    for (const chordPc of chordSet) {
+      const halfAbove = (chordPc + 1) % 12;
+      if (scaleSet.has(halfAbove) && !chordSet.has(halfAbove) && !tensionPCs.has(halfAbove)) {
+        avoidPCs.add(halfAbove);
+      }
+    }
+
+    return { targetPCs, tensionPCs, avoidPCs };
   }
 
   function applyScaleOverlay() {
@@ -284,7 +380,6 @@
     const svgs = elGrid.querySelectorAll('svg.chord-diagram');
 
     if (!idx || !currentScales[idx]) {
-      // Limpiar overlays
       svgs.forEach(svg => {
         svg.querySelectorAll('.scale-overlay').forEach(el => el.remove());
       });
@@ -293,14 +388,18 @@
     }
 
     const scale = currentScales[idx];
-    const scalePCSet = new Set(scale.scalePCs);
     const chordPCSet = new Set(currentChordPCs);
+    const targetOpts = showTargets ? computeTargetOpts(currentChord, scale.scalePCs) : null;
 
-    // Mostrar notas de la escala
+    // Mostrar notas de la escala con jerarquía visual
     const noteNames = scale.scalePCs.map(pc => {
       const name = window.MusicTheory.pcToName(pc);
-      const isChordTone = chordPCSet.has(pc);
-      return `<span class="note${isChordTone ? ' chord-tone' : ''}">${name}</span>`;
+      let cls = 'note';
+      if (targetOpts && targetOpts.targetPCs.has(pc)) cls += ' target-note';
+      else if (chordPCSet.has(pc)) cls += ' chord-tone';
+      else if (targetOpts && targetOpts.tensionPCs.has(pc)) cls += ' tension-note';
+      else if (targetOpts && targetOpts.avoidPCs.has(pc)) cls += ' avoid-note';
+      return `<span class="${cls}">${name}</span>`;
     });
     elScaleNotes.innerHTML = 'Notas: ' + noteNames.join(' ');
 
@@ -309,10 +408,9 @@
     cards.forEach(card => {
       const svg = card.querySelector('svg.chord-diagram');
       if (!svg) return;
-      // Recuperar el voicing de los datos del card
       const voicing = card._voicing;
       if (!voicing) return;
-      addScaleOverlay(svg, voicing, scale.scalePCs, currentChordPCs);
+      addScaleOverlay(svg, voicing, scale.scalePCs, currentChordPCs, targetOpts);
     });
   }
 
