@@ -6,34 +6,41 @@
   let ctx = null;
   let activeSources = [];
   let scaleTimeouts = [];
-  let unlocked = false;
 
   function getContext() {
     if (!ctx) {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
     }
-    if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
 
-  // iOS requiere reproducir un buffer dentro de un gesto de usuario
-  // para desbloquear el AudioContext. Se ejecuta una sola vez.
-  function unlockAudio() {
-    if (unlocked) return;
+  // Asegurar que el AudioContext esté activo.
+  // En iOS debe llamarse dentro de un gesto de usuario (touch/click).
+  // Se llama en CADA interacción porque iOS puede re-suspender el contexto
+  // (al cambiar de app, bloquear pantalla, etc.).
+  function ensureAudioReady() {
     var ac = getContext();
+    if (ac.state === 'suspended') {
+      ac.resume();
+    }
+    // Reproducir un buffer silencioso para forzar el desbloqueo en iOS.
+    // Esto es necesario la primera vez; en llamadas posteriores es inofensivo.
     var buf = ac.createBuffer(1, 1, ac.sampleRate);
     var src = ac.createBufferSource();
     src.buffer = buf;
     src.connect(ac.destination);
-    src.start(0);
-    unlocked = true;
-    document.removeEventListener('touchstart', unlockAudio, true);
-    document.removeEventListener('touchend', unlockAudio, true);
-    document.removeEventListener('click', unlockAudio, true);
+    src.start(ac.currentTime);
   }
-  document.addEventListener('touchstart', unlockAudio, true);
-  document.addEventListener('touchend', unlockAudio, true);
-  document.addEventListener('click', unlockAudio, true);
+
+  // Listener persistente: desbloquea/resume en cada gesto del usuario.
+  // NO se remueve para cubrir re-suspensiones de iOS.
+  function onUserGesture() {
+    ensureAudioReady();
+  }
+  document.addEventListener('touchstart', onUserGesture, true);
+  document.addEventListener('touchend', onUserGesture, true);
+  document.addEventListener('click', onUserGesture, true);
 
   /**
    * Convierte MIDI note number a frecuencia en Hz.
@@ -168,6 +175,7 @@
     if (midi == null) return;
     duration = duration || 3;
     const ac = getContext();
+    if (ac.state === 'suspended') ac.resume();
     const freq = midiToFreq(midi);
     const audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
     createAudioChain(ac, audioBuffer, ac.currentTime, duration, 0.4);
@@ -182,6 +190,7 @@
     if (!midiNotes) return;
     duration = duration || 4;
     const ac = getContext();
+    if (ac.state === 'suspended') ac.resume();
     const strumDelay = 0.030; // 30ms entre cuerdas
 
     const validNotes = midiNotes
