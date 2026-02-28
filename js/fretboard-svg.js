@@ -263,15 +263,19 @@
     // Helper para determinar color/estilo según jerarquía
     function getNoteStyle(pc, isChordPos) {
       const isTarget = targetOpts && targetOpts.targetPCs && targetOpts.targetPCs.has(pc);
+      const isModal = targetOpts && targetOpts.modalPCs && targetOpts.modalPCs.has(pc);
       const isTension = targetOpts && targetOpts.tensionPCs && targetOpts.tensionPCs.has(pc);
       const isAvoid = targetOpts && targetOpts.avoidPCs && targetOpts.avoidPCs.has(pc);
       const isChordTone = chordSet.has(pc);
 
       if (isChordPos) {
-        // Nota del voicing: anillo
-        return { ring: true, color: isTarget ? '#ffe66d' : '#4ecdc4', width: isTarget ? 3 : 2.5 };
+        // Nota del voicing: anillo (gold target > violeta modal > teal)
+        const color = isTarget ? '#ffe66d' : isModal ? '#bb86fc' : '#4ecdc4';
+        const width = isTarget ? 3 : isModal ? 3 : 2.5;
+        return { ring: true, color, width };
       }
       if (isTarget) return { fill: '#ffe66d', opacity: 0.85, r: 6, textFill: '#333' };
+      if (isModal) return { fill: '#bb86fc', opacity: 0.80, r: 6, textFill: '#fff' };
       if (isChordTone) return { fill: '#4ecdc4', opacity: 0.8, r: 5, textFill: '#fff' };
       if (isTension) return { fill: '#ff9f43', opacity: 0.65, r: 5, textFill: '#fff' };
       if (isAvoid) return { fill: '#ff6b6b', opacity: 0.3, r: 4, textFill: '#fff' };

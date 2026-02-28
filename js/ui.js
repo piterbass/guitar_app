@@ -338,11 +338,11 @@
     }
   }
 
-  function computeTargetOpts(chord, scalePCs) {
-    if (!chord || !chord.intervals || !scalePCs) return null;
+  function computeTargetOpts(chord, scale) {
+    if (!chord || !chord.intervals || !scale || !scale.scalePCs) return null;
 
-    const { INTERVAL_SEMITONES } = window.MusicTheory;
-    const scaleSet = new Set(scalePCs);
+    const { INTERVAL_SEMITONES, getModalCharacteristicPCs } = window.MusicTheory;
+    const scaleSet = new Set(scale.scalePCs);
     const chordSet = new Set(chord.pitchClasses);
 
     // Guide tones: 3ra y 7ma
@@ -372,7 +372,10 @@
       }
     }
 
-    return { targetPCs, tensionPCs, avoidPCs };
+    // Notas características modales
+    const modalPCs = new Set(getModalCharacteristicPCs(scale.root, scale.scaleKey));
+
+    return { targetPCs, tensionPCs, avoidPCs, modalPCs };
   }
 
   function applyScaleOverlay() {
@@ -389,13 +392,14 @@
 
     const scale = currentScales[idx];
     const chordPCSet = new Set(currentChordPCs);
-    const targetOpts = showTargets ? computeTargetOpts(currentChord, scale.scalePCs) : null;
+    const targetOpts = showTargets ? computeTargetOpts(currentChord, scale) : null;
 
     // Mostrar notas de la escala con jerarquía visual
     const noteNames = scale.scalePCs.map(pc => {
       const name = window.MusicTheory.pcToName(pc);
       let cls = 'note';
       if (targetOpts && targetOpts.targetPCs.has(pc)) cls += ' target-note';
+      else if (targetOpts && targetOpts.modalPCs && targetOpts.modalPCs.has(pc)) cls += ' modal-char-note';
       else if (chordPCSet.has(pc)) cls += ' chord-tone';
       else if (targetOpts && targetOpts.tensionPCs.has(pc)) cls += ' tension-note';
       else if (targetOpts && targetOpts.avoidPCs.has(pc)) cls += ' avoid-note';

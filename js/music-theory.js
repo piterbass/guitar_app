@@ -176,9 +176,98 @@ function fretToPC(stringIndex, fret) {
   return (STANDARD_TUNING[stringIndex] + fret) % 12;
 }
 
+// ── Nota característica modal ──────────────────────────────
+
+/**
+ * Mapa de escala → escala de referencia para calcular nota característica.
+ * null = es la referencia misma o no aplica (escalas simétricas, pentatónicas, etc.)
+ */
+const MODE_REFERENCE = {
+  // Modos diatónicos mayores → referencia: major (jónico)
+  'major': null,
+  'lydian': 'major',
+  'mixolydian': 'major',
+  'ionian-sharp5': 'major',
+
+  // Modos diatónicos menores → referencia: aeolian (eólico)
+  'aeolian': null,
+  'dorian': 'aeolian',
+  'phrygian': 'aeolian',
+  'locrian': 'aeolian',
+
+  // Menor melódica y modos → referencia: aeolian
+  'melodic-minor': 'aeolian',
+  'dorian-b2': 'aeolian',
+  'dorian-sharp4': 'aeolian',
+  'locrian-nat2': 'aeolian',
+
+  // Menor armónica y modos → referencia: aeolian
+  'harmonic-minor': 'aeolian',
+  'locrian-nat6': 'aeolian',
+
+  // Modos con sonoridad mayor derivada → referencia: major
+  'lydian-augmented': 'major',
+  'lydian-dominant': 'major',
+  'lydian-sharp2': 'major',
+  'harmonic-major': 'major',
+  'double-harmonic': 'major',
+
+  // Modos dominantes alterados → referencia: mixolydian
+  'phrygian-dominant': 'mixolydian',
+  'altered': 'mixolydian',
+  'mixolydian-b6': 'mixolydian',
+  'half-whole-dim': 'mixolydian',
+
+  // Escalas sin referencia modal → null
+  'whole-tone': null,
+  'diminished': null,
+  'augmented': null,
+  'pentatonic-major': null,
+  'pentatonic-minor': null,
+  'blues': null,
+  'blues-major': null,
+  'bebop-dominant': null,
+  'bebop-major': null,
+  'bebop-dorian': null,
+  'bebop-melodic-minor': null,
+  'in-sen': null,
+  'hirajoshi': null,
+};
+
+/**
+ * Calcula las pitch classes de las notas características modales.
+ * Compara la escala dada con su escala de referencia y devuelve
+ * las notas que están en el modo pero NO en la referencia.
+ *
+ * @param {number} rootPc – pitch class de la raíz (0-11)
+ * @param {string} scaleKey – clave de SCALE_FORMULAS
+ * @returns {number[]} pitch classes de las notas características
+ */
+function getModalCharacteristicPCs(rootPc, scaleKey) {
+  const ref = MODE_REFERENCE[scaleKey];
+  if (ref === null || ref === undefined) return [];
+
+  const modeFormula = SCALE_FORMULAS[scaleKey];
+  const refFormula = SCALE_FORMULAS[ref];
+  if (!modeFormula || !refFormula) return [];
+
+  // Convertir a sets de semitonos relativos a la raíz
+  const refSemitones = new Set(refFormula.map(iv => INTERVAL_SEMITONES[iv] || 0));
+
+  const result = [];
+  for (const iv of modeFormula) {
+    const semi = INTERVAL_SEMITONES[iv] || 0;
+    if (!refSemitones.has(semi)) {
+      result.push((rootPc + semi) % 12);
+    }
+  }
+  return result;
+}
+
 // Exportar como global (vanilla JS)
 window.MusicTheory = {
   NOTE_NAMES, NOTE_TO_PC, ENHARMONIC, INTERVAL_SEMITONES,
   CHORD_FORMULAS, SCALE_FORMULAS, STANDARD_TUNING, STRING_NAMES,
-  intervalsToPC, pcToName, fretToPC, getScalePCs,
+  MODE_REFERENCE,
+  intervalsToPC, pcToName, fretToPC, getScalePCs, getModalCharacteristicPCs,
 };
