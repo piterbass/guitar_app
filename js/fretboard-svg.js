@@ -135,10 +135,15 @@
         svg.appendChild(xMark);
       } else if (fret === 0) {
         // Open (O)
-        svg.appendChild(svgEl('circle', {
+        const openCircle = svgEl('circle', {
           cx: x, cy: CFG.padTop - 12,
           r: 5, fill: 'none', stroke: '#333', 'stroke-width': 1.5
-        }));
+        });
+        openCircle.style.cursor = 'pointer';
+        openCircle.addEventListener('click', (function (midi) {
+          return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
+        })(STANDARD_TUNING[s]));
+        svg.appendChild(openCircle);
       } else {
         // Dot en el traste
         const y = CFG.padTop + (fret - startFret + 0.5) * CFG.fretSpacing;
@@ -148,10 +153,15 @@
             s >= voicing.barre.fromString && s <= voicing.barre.toString) {
           // Ya dibujado por el barré
         } else {
-          svg.appendChild(svgEl('circle', {
+          const dot = svgEl('circle', {
             cx: x, cy: y, r: CFG.dotRadius,
             fill: '#333'
-          }));
+          });
+          dot.style.cursor = 'pointer';
+          dot.addEventListener('click', (function (midi) {
+            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
+          })(STANDARD_TUNING[s] + fret));
+          svg.appendChild(dot);
         }
 
         // Número de dedo
@@ -235,7 +245,7 @@
 
     const scaleSet = new Set(scalePCs);
     const chordSet = new Set(chordPCs);
-    const { fretToPC } = window.MusicTheory;
+    const { fretToPC, STANDARD_TUNING } = window.MusicTheory;
 
     // Calcular startFret (misma lógica que createDiagram)
     const frettedPositions = voicing.frets.filter(f => f > 0);
@@ -291,10 +301,16 @@
         const pc = fretToPC(s, 0);
         if (scaleSet.has(pc) && !chordPositions.has(s + ',0')) {
           const st = getNoteStyle(pc, false);
-          group.appendChild(svgEl('circle', {
+          const openDot = svgEl('circle', {
             cx: x, cy: CFG.padTop - 12,
             r: Math.min(st.r, 4), fill: st.fill, opacity: st.opacity,
-          }));
+            'data-midi': STANDARD_TUNING[s],
+          });
+          openDot.style.cursor = 'pointer';
+          openDot.addEventListener('click', (function (midi) {
+            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
+          })(STANDARD_TUNING[s]));
+          group.appendChild(openDot);
         }
       }
 
@@ -306,19 +322,29 @@
         const isChordPos = chordPositions.has(s + ',' + fret);
         const st = getNoteStyle(pc, isChordPos);
 
+        const midi = STANDARD_TUNING[s] + fret;
+
         if (st.ring) {
           // Nota del voicing: anillo alrededor
-          group.appendChild(svgEl('circle', {
+          const ring = svgEl('circle', {
             cx: x, cy: y,
             r: CFG.dotRadius + 3,
             fill: 'none', stroke: st.color, 'stroke-width': st.width,
-          }));
+            'data-midi': midi,
+          });
+          group.appendChild(ring);
         } else {
           // Nota de escala: punto coloreado
-          group.appendChild(svgEl('circle', {
+          const scaleDot = svgEl('circle', {
             cx: x, cy: y, r: st.r,
             fill: st.fill, opacity: st.opacity,
-          }));
+            'data-midi': midi,
+          });
+          scaleDot.style.cursor = 'pointer';
+          scaleDot.addEventListener('click', (function (m) {
+            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(m); };
+          })(midi));
+          group.appendChild(scaleDot);
           // Nombre de la nota
           const noteText = svgEl('text', {
             x: x, y: y + 3,

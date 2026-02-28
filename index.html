@@ -641,6 +641,35 @@
       border-color: #c00;
     }
 
+    .btn-play {
+      color: #4ecdc4;
+      font-size: 1.1rem;
+    }
+    .btn-play:hover {
+      color: #ffe66d;
+      border-color: #ffe66d;
+    }
+
+    .note-playing {
+      filter: brightness(1.8) drop-shadow(0 0 8px #ffe66d);
+      transition: filter 0.15s ease;
+    }
+
+    .btn-scale-ref {
+      color: #888;
+      font-size: 1.1rem;
+    }
+    .btn-scale-ref:hover,
+    .btn-scale-ref.active {
+      color: #bb86fc;
+      border-color: #bb86fc;
+    }
+
+    .voicing-card.scale-ref-active {
+      outline: 2px solid #bb86fc;
+      outline-offset: -2px;
+    }
+
     .bank-group-header {
       grid-column: 1 / -1;
       padding: 8px 12px;
@@ -1397,6 +1426,12 @@
           <label class="target-toggle">
             <input type="checkbox" id="show-targets" checked> Target notes
           </label>
+          <button id="play-scale-btn" class="btn-small" title="Reproducir escala" style="margin-left:10px;">&#9654; Escala</button>
+          <select id="scale-tempo" style="padding:4px 6px; font-size:12px; margin-left:4px;">
+            <option value="500">Lento</option>
+            <option value="300" selected>Normal</option>
+            <option value="150">R&aacute;pido</option>
+          </select>
         </div>
         <div id="scale-notes" class="scale-notes"></div>
       </div>
@@ -1502,6 +1537,7 @@
   <script src="js/songbook.js"></script>
   <script src="js/song-editor.js"></script>
   <script src="js/song-view.js"></script>
+  <script src="js/audio-engine.js"></script>
   <script src="js/ui.js"></script>
 
   <!-- Service Worker para PWA offline -->

@@ -17,6 +17,7 @@
   let elTabGen, elTabBank, elManualSection, elBankSearch, elBankSearchInput;
   let elScaleSection, elScaleSelect, elScaleNotes;
   let elScaleModeToggle, elHarmonicFunction, elShowTargets;
+  let elPlayScaleBtn, elScaleTempo;
   let syncLock = false;
   let currentTab = 'generated';
 
@@ -27,6 +28,8 @@
   let scaleMode = 'compatible';
   let harmonicFunction = 'tonica';
   let showTargets = true;
+  let currentScalePlayback = null;
+  let scaleRefCard = null; // card seleccionada como referencia para reproducir escala
 
   // ── Navegación principal ────────────────────────────────────
 
@@ -69,6 +72,8 @@
     elScaleModeToggle = document.getElementById('scale-mode-toggle');
     elHarmonicFunction = document.getElementById('harmonic-function');
     elShowTargets = document.getElementById('show-targets');
+    elPlayScaleBtn = document.getElementById('play-scale-btn');
+    elScaleTempo = document.getElementById('scale-tempo');
 
     populateSelectors();
 
@@ -106,6 +111,11 @@
       showTargets = elShowTargets.checked;
       applyScaleOverlay();
     });
+
+    // Play scale button
+    if (elPlayScaleBtn) {
+      elPlayScaleBtn.addEventListener('click', playCurrentScale);
+    }
 
     // Sync texto ↔ selectores
     elInput.addEventListener('input', () => {
@@ -418,6 +428,74 @@
     });
   }
 
+  /**
+   * Reproduce la escala seleccionada con animación visual sincronizada.
+   * Calcula las notas MIDI desde los pitch classes de la escala (ascendente,
+   * una octava desde la raíz más grave posible en guitarra) e ilumina los
+   * dots correspondientes en TODOS los diagramas visibles.
+   */
+  function playCurrentScale() {
+    if (!window.AudioEngine) return;
+
+    // Detener reproducción anterior
+    if (currentScalePlayback) {
+      currentScalePlayback.stop();
+      currentScalePlayback = null;
+    }
+    clearScaleHighlights();
+
+    const idx = elScaleSelect.value;
+    if (!idx || !currentScales[idx]) return;
+
+    const scale = currentScales[idx];
+    const scaleSet = new Set(scale.scalePCs);
+
+    // Usar la card de referencia seleccionada, o la primera visible
+    const refCard = (scaleRefCard && elGrid.contains(scaleRefCard))
+      ? scaleRefCard
+      : elGrid.querySelector('.voicing-card');
+    if (!refCard) return;
+
+    const refSvg = refCard.querySelector('svg.chord-diagram');
+    if (!refSvg) return;
+
+    // Obtener notas MIDI del overlay de la card de referencia
+    const dots = Array.from(refSvg.querySelectorAll('.scale-overlay [data-midi]'));
+    if (dots.length === 0) return;
+
+    // Ordenar por MIDI ascendente y eliminar duplicados
+    dots.sort((a, b) => Number(a.getAttribute('data-midi')) - Number(b.getAttribute('data-midi')));
+    const seen = new Set();
+    const uniqueDots = dots.filter(d => {
+      const m = d.getAttribute('data-midi');
+      if (seen.has(m)) return false;
+      seen.add(m);
+      return true;
+    });
+
+    const midiNotes = uniqueDots.map(d => Number(d.getAttribute('data-midi')));
+    if (midiNotes.length === 0) return;
+
+    const interval = elScaleTempo ? Number(elScaleTempo.value) || 300 : 300;
+
+    currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, (noteIdx) => {
+      clearScaleHighlights();
+      if (noteIdx >= 0 && noteIdx < midiNotes.length) {
+        // Iluminar dots solo en el diagrama de referencia
+        const midi = midiNotes[noteIdx];
+        refSvg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
+          .forEach(el => el.classList.add('note-playing'));
+      }
+      if (noteIdx === -1) {
+        currentScalePlayback = null;
+      }
+    });
+  }
+
+  function clearScaleHighlights() {
+    document.querySelectorAll('.note-playing').forEach(el => el.classList.remove('note-playing'));
+  }
+
   // ── Vista Banco ─────────────────────────────────────────────
 
   function renderBankView() {
@@ -510,6 +588,39 @@
       });
       actions.appendChild(delBtn);
     }
+
+    // Botón reproducir acorde
+    const playBtn = document.createElement('button');
+    playBtn.className = 'btn-card-action btn-play';
+    playBtn.title = 'Reproducir acorde';
+    playBtn.innerHTML = '&#9654;';
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!window.AudioEngine) return;
+      const { STANDARD_TUNING } = window.MusicTheory;
+      const midiNotes = voicing.frets.map((f, i) =>
+        f === -1 ? null : STANDARD_TUNING[i] + f
+      );
+      window.AudioEngine.playChord(midiNotes);
+    });
+    actions.appendChild(playBtn);
+
+    // Botón seleccionar como referencia de escala
+    const scaleRefBtn = document.createElement('button');
+    scaleRefBtn.className = 'btn-card-action btn-scale-ref';
+    scaleRefBtn.title = 'Usar como referencia para escala';
+    scaleRefBtn.innerHTML = '&#9835;'; // ♫
+    scaleRefBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Quitar selección anterior
+      document.querySelectorAll('.voicing-card.scale-ref-active').forEach(c => c.classList.remove('scale-ref-active'));
+      document.querySelectorAll('.btn-scale-ref.active').forEach(b => b.classList.remove('active'));
+      // Marcar esta card
+      card.classList.add('scale-ref-active');
+      scaleRefBtn.classList.add('active');
+      scaleRefCard = card;
+    });
+    actions.appendChild(scaleRefBtn);
 
     card.appendChild(actions);
     return card;
