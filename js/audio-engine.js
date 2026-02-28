@@ -7,6 +7,8 @@
   let activeSources = [];
   let scaleTimeouts = [];
 
+  let unlocked = false;
+
   function getContext() {
     if (!ctx) {
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -15,28 +17,22 @@
     return ctx;
   }
 
-  // Asegurar que el AudioContext esté activo.
-  // En iOS debe llamarse dentro de un gesto de usuario (touch/click).
-  // Se llama en CADA interacción porque iOS puede re-suspender el contexto
-  // (al cambiar de app, bloquear pantalla, etc.).
-  function ensureAudioReady() {
-    var ac = getContext();
-    if (ac.state === 'suspended') {
-      ac.resume();
-    }
-    // Reproducir un buffer silencioso para forzar el desbloqueo en iOS.
-    // Esto es necesario la primera vez; en llamadas posteriores es inofensivo.
-    var buf = ac.createBuffer(1, 1, ac.sampleRate);
-    var src = ac.createBufferSource();
-    src.buffer = buf;
-    src.connect(ac.destination);
-    src.start(ac.currentTime);
-  }
-
-  // Listener persistente: desbloquea/resume en cada gesto del usuario.
-  // NO se remueve para cubrir re-suspensiones de iOS.
+  // iOS requiere reproducir audio dentro de un gesto de usuario para
+  // desbloquear el AudioContext. Se reproduce un buffer silencioso UNA vez.
+  // En gestos posteriores solo se llama resume() (ligero, sin crear nodos).
   function onUserGesture() {
-    ensureAudioReady();
+    var ac = getContext();
+    if (!unlocked) {
+      // Primer gesto: reproducir buffer silencioso para desbloquear iOS
+      var buf = ac.createBuffer(1, 1, ac.sampleRate);
+      var src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(ac.destination);
+      src.start(ac.currentTime);
+      unlocked = true;
+    }
+    // Siempre intentar resume (cubre re-suspensión por cambio de app, etc.)
+    if (ac.state === 'suspended') ac.resume();
   }
   document.addEventListener('touchstart', onUserGesture, true);
   document.addEventListener('touchend', onUserGesture, true);
@@ -138,47 +134,70 @@
    * El filtro simula la resonancia del cuerpo de la guitarra.
    */
   function createAudioChain(ac, audioBuffer, startTime, duration, volume) {
-    const source = ac.createBufferSource();
-    source.buffer = audioBuffer;
+    try {
+      // Asegurar que startTime no esté en el pasado
+      var now = ac.currentTime;
+      if (startTime < now) startTime = now;
 
-    // Filtro de cuerpo: recorta solo los armónicos más ásperos
-    const body = ac.createBiquadFilter();
-    body.type = 'lowpass';
-    body.frequency.setValueAtTime(5000, startTime);
-    body.Q.setValueAtTime(0.5, startTime);
+      const source = ac.createBufferSource();
+      source.buffer = audioBuffer;
 
-    // Resonancia sutil de caja (no exagerar para no oscurecer)
-    const bodyRes = ac.createBiquadFilter();
-    bodyRes.type = 'peaking';
-    bodyRes.frequency.setValueAtTime(200, startTime);
-    bodyRes.gain.setValueAtTime(1.5, startTime);
-    bodyRes.Q.setValueAtTime(1.0, startTime);
+      // Filtro de cuerpo: recorta solo los armónicos más ásperos
+      const body = ac.createBiquadFilter();
+      body.type = 'lowpass';
+      body.frequency.value = 5000;
+      body.Q.value = 0.5;
 
-    const gain = ac.createGain();
-    gain.gain.setValueAtTime(volume, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      // Resonancia sutil de caja (no exagerar para no oscurecer)
+      const bodyRes = ac.createBiquadFilter();
+      bodyRes.type = 'peaking';
+      bodyRes.frequency.value = 200;
+      bodyRes.gain.value = 1.5;
+      bodyRes.Q.value = 1.0;
 
-    source.connect(body).connect(bodyRes).connect(gain).connect(ac.destination);
-    source.start(startTime);
-    source.stop(startTime + duration);
+      const gain = ac.createGain();
+      gain.gain.setValueAtTime(volume, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
-    activeSources.push(source);
-    source.onended = () => {
-      const i = activeSources.indexOf(source);
-      if (i !== -1) activeSources.splice(i, 1);
-    };
+      source.connect(body).connect(bodyRes).connect(gain).connect(ac.destination);
+      source.start(startTime);
+      source.stop(startTime + duration);
 
-    return source;
+      activeSources.push(source);
+      source.onended = function () {
+        const i = activeSources.indexOf(source);
+        if (i !== -1) activeSources.splice(i, 1);
+      };
+
+      return source;
+    } catch (e) {
+      // Fallback: reproducir directo sin filtros
+      try {
+        var src2 = ac.createBufferSource();
+        src2.buffer = audioBuffer;
+        var g2 = ac.createGain();
+        g2.gain.value = volume;
+        src2.connect(g2).connect(ac.destination);
+        src2.start();
+        activeSources.push(src2);
+        src2.onended = function () {
+          var j = activeSources.indexOf(src2);
+          if (j !== -1) activeSources.splice(j, 1);
+        };
+        return src2;
+      } catch (e2) { return null; }
+    }
   }
 
   function playNote(midi, duration) {
     if (midi == null) return;
     duration = duration || 3;
-    const ac = getContext();
+    var ac = getContext();
     if (ac.state === 'suspended') ac.resume();
-    const freq = midiToFreq(midi);
-    const audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
-    createAudioChain(ac, audioBuffer, ac.currentTime, duration, 0.4);
+    var freq = midiToFreq(midi);
+    var audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
+    // Pequeño offset para dar tiempo a iOS a activar el contexto
+    createAudioChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
   }
 
   /**
@@ -197,8 +216,9 @@
       .map((midi, i) => ({ midi, i }))
       .filter(n => n.midi != null);
 
+    var baseTime = ac.currentTime + 0.02; // offset para iOS
     validNotes.forEach((note, idx) => {
-      const startTime = ac.currentTime + idx * strumDelay;
+      const startTime = baseTime + idx * strumDelay;
       const freq = midiToFreq(note.midi);
       const audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
       createAudioChain(ac, audioBuffer, startTime, duration, 0.32);
