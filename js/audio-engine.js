@@ -6,12 +6,34 @@
   let ctx = null;
   let activeSources = [];
   let scaleTimeouts = [];
+  let unlocked = false;
 
   function getContext() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
+
+  // iOS requiere reproducir un buffer dentro de un gesto de usuario
+  // para desbloquear el AudioContext. Se ejecuta una sola vez.
+  function unlockAudio() {
+    if (unlocked) return;
+    var ac = getContext();
+    var buf = ac.createBuffer(1, 1, ac.sampleRate);
+    var src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(ac.destination);
+    src.start(0);
+    unlocked = true;
+    document.removeEventListener('touchstart', unlockAudio, true);
+    document.removeEventListener('touchend', unlockAudio, true);
+    document.removeEventListener('click', unlockAudio, true);
+  }
+  document.addEventListener('touchstart', unlockAudio, true);
+  document.addEventListener('touchend', unlockAudio, true);
+  document.addEventListener('click', unlockAudio, true);
 
   /**
    * Convierte MIDI note number a frecuencia en Hz.
@@ -31,7 +53,8 @@
    */
   function createPluckBuffer(frequency, duration, sampleRate) {
     const numSamples = Math.ceil(duration * sampleRate);
-    const buffer = new AudioBuffer({ length: numSamples, sampleRate });
+    const ac = getContext();
+    const buffer = ac.createBuffer(1, numSamples, sampleRate);
     const channel = buffer.getChannelData(0);
 
     // Delay line = una longitud de onda
