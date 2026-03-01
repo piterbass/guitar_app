@@ -15,6 +15,7 @@
     stringSpacing: 20,
     fretSpacing: 28,
     dotRadius: 7,
+    hitRadius: 14, // área táctil invisible, más grande para móvil
     fontSize: 11,
   };
 
@@ -110,30 +111,14 @@
       const barreY = CFG.padTop + (b.fret - startFret + 0.5) * CFG.fretSpacing;
       const x1 = CFG.padLeft + b.fromString * CFG.stringSpacing;
       const x2 = CFG.padLeft + b.toString * CFG.stringSpacing;
-      const barreRect = svgEl('rect', {
+      svg.appendChild(svgEl('rect', {
         x: x1 - CFG.dotRadius,
         y: barreY - CFG.dotRadius * 0.7,
         width: x2 - x1 + CFG.dotRadius * 2,
         height: CFG.dotRadius * 1.4,
-        fill: '#333', rx: CFG.dotRadius * 0.7
-      });
-      barreRect.style.cursor = 'pointer';
-      barreRect.addEventListener('click', (function (barre) {
-        return function (e) {
-          e.stopPropagation();
-          if (!window.AudioEngine) return;
-          // Determinar qué cuerda se tocó según posición X del click
-          var rect = e.target.getBoundingClientRect();
-          var clickX = e.clientX - rect.left;
-          var totalW = rect.width;
-          var numStrings = barre.toString - barre.fromString;
-          var stringIdx = Math.round((clickX / totalW) * numStrings) + barre.fromString;
-          stringIdx = Math.max(barre.fromString, Math.min(barre.toString, stringIdx));
-          var midi = STANDARD_TUNING[stringIdx] + barre.fret;
-          window.AudioEngine.playNote(midi);
-        };
-      })(b));
-      svg.appendChild(barreRect);
+        fill: '#333', rx: CFG.dotRadius * 0.7,
+        'pointer-events': 'none'
+      }));
     }
 
     // Dots y markers por cada cuerda
@@ -152,32 +137,29 @@
         svg.appendChild(xMark);
       } else if (fret === 0) {
         // Open (O)
+        addHitArea(svg, x, CFG.padTop - 12, STANDARD_TUNING[s]);
         const openCircle = svgEl('circle', {
           cx: x, cy: CFG.padTop - 12,
-          r: 5, fill: 'none', stroke: '#333', 'stroke-width': 1.5
+          r: 5, fill: 'none', stroke: '#333', 'stroke-width': 1.5,
+          'pointer-events': 'none'
         });
-        openCircle.style.cursor = 'pointer';
-        openCircle.addEventListener('click', (function (midi) {
-          return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
-        })(STANDARD_TUNING[s]));
         svg.appendChild(openCircle);
       } else {
         // Dot en el traste
         const y = CFG.padTop + (fret - startFret + 0.5) * CFG.fretSpacing;
 
-        // Si es parte del barré, no dibujar dot individual
+        // Hit area para todas las notas (incluyendo barré)
+        addHitArea(svg, x, y, STANDARD_TUNING[s] + fret);
+
+        // Si es parte del barré, no dibujar dot individual (ya está el rect)
         if (voicing.barre && fret === voicing.barre.fret &&
             s >= voicing.barre.fromString && s <= voicing.barre.toString) {
-          // Ya dibujado por el barré
+          // Visual ya dibujado por el barré
         } else {
           const dot = svgEl('circle', {
             cx: x, cy: y, r: CFG.dotRadius,
-            fill: '#333'
+            fill: '#333', 'pointer-events': 'none'
           });
-          dot.style.cursor = 'pointer';
-          dot.addEventListener('click', (function (midi) {
-            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
-          })(STANDARD_TUNING[s] + fret));
           svg.appendChild(dot);
         }
 
@@ -244,6 +226,24 @@
       el.setAttribute(k, v);
     }
     return el;
+  }
+
+  /**
+   * Crea un círculo invisible grande como hit area para facilitar taps en móvil.
+   * Se inserta en el parent SVG/group ANTES del dot visible.
+   */
+  function addHitArea(parent, cx, cy, midi) {
+    var hit = svgEl('circle', {
+      cx: cx, cy: cy, r: CFG.hitRadius,
+      fill: 'transparent', stroke: 'none'
+    });
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (window.AudioEngine) window.AudioEngine.playNote(midi);
+    });
+    parent.appendChild(hit);
+    return hit;
   }
 
   /**
@@ -318,15 +318,13 @@
         const pc = fretToPC(s, 0);
         if (scaleSet.has(pc) && !chordPositions.has(s + ',0')) {
           const st = getNoteStyle(pc, false);
+          addHitArea(group, x, CFG.padTop - 12, STANDARD_TUNING[s]);
           const openDot = svgEl('circle', {
             cx: x, cy: CFG.padTop - 12,
             r: Math.min(st.r, 4), fill: st.fill, opacity: st.opacity,
             'data-midi': STANDARD_TUNING[s],
+            'pointer-events': 'none',
           });
-          openDot.style.cursor = 'pointer';
-          openDot.addEventListener('click', (function (midi) {
-            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(midi); };
-          })(STANDARD_TUNING[s]));
           group.appendChild(openDot);
         }
       }
@@ -341,6 +339,9 @@
 
         const midi = STANDARD_TUNING[s] + fret;
 
+        // Hit area grande para todas las notas de escala
+        addHitArea(group, x, y, midi);
+
         if (st.ring) {
           // Nota del voicing: anillo alrededor
           const ring = svgEl('circle', {
@@ -348,6 +349,7 @@
             r: CFG.dotRadius + 3,
             fill: 'none', stroke: st.color, 'stroke-width': st.width,
             'data-midi': midi,
+            'pointer-events': 'none',
           });
           group.appendChild(ring);
         } else {
@@ -356,11 +358,8 @@
             cx: x, cy: y, r: st.r,
             fill: st.fill, opacity: st.opacity,
             'data-midi': midi,
+            'pointer-events': 'none',
           });
-          scaleDot.style.cursor = 'pointer';
-          scaleDot.addEventListener('click', (function (m) {
-            return function (e) { e.stopPropagation(); if (window.AudioEngine) window.AudioEngine.playNote(m); };
-          })(midi));
           group.appendChild(scaleDot);
           // Nombre de la nota
           const noteText = svgEl('text', {
