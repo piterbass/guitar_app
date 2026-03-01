@@ -448,7 +448,6 @@
     if (!idx || !currentScales[idx]) return;
 
     const scale = currentScales[idx];
-    const scaleSet = new Set(scale.scalePCs);
 
     // Usar la card de referencia seleccionada, o la primera visible
     const refCard = (scaleRefCard && elGrid.contains(scaleRefCard))
@@ -459,31 +458,17 @@
     const refSvg = refCard.querySelector('svg.chord-diagram');
     if (!refSvg) return;
 
-    // Obtener notas MIDI del overlay de la card de referencia
-    const dots = Array.from(refSvg.querySelectorAll('.scale-overlay [data-midi]'));
-    if (dots.length === 0) return;
-
-    // Ordenar por MIDI ascendente y eliminar duplicados
-    dots.sort((a, b) => Number(a.getAttribute('data-midi')) - Number(b.getAttribute('data-midi')));
-    const seen = new Set();
-    const uniqueDots = dots.filter(d => {
-      const m = d.getAttribute('data-midi');
-      if (seen.has(m)) return false;
-      seen.add(m);
-      return true;
-    });
-
-    const midiNotes = uniqueDots.map(d => Number(d.getAttribute('data-midi')));
+    // Pre-capturar elementos y construir mapa midi→elements
+    const { midiNotes, midiMap } = buildMidiMap(refSvg);
     if (midiNotes.length === 0) return;
 
     const interval = elScaleTempo ? Number(elScaleTempo.value) || 300 : 300;
 
-    currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, (noteIdx) => {
+    currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, function (noteIdx) {
       clearScaleHighlights();
       if (noteIdx >= 0 && noteIdx < midiNotes.length) {
-        const midi = midiNotes[noteIdx];
-        refSvg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
-          .forEach(el => highlightNote(el));
+        var elems = midiMap[midiNotes[noteIdx]];
+        if (elems) elems.forEach(function (el) { highlightNote(el); });
       }
       if (noteIdx === -1) {
         currentScalePlayback = null;
@@ -491,29 +476,62 @@
     });
   }
 
+  /**
+   * Pre-captura los elementos SVG con data-midi y construye un mapa
+   * para evitar querySelectorAll dentro de los callbacks de setTimeout.
+   */
+  function buildMidiMap(svg) {
+    var dots = Array.from(svg.querySelectorAll('.scale-overlay [data-midi]'));
+    if (dots.length === 0) return { midiNotes: [], midiMap: {} };
+
+    dots.sort(function (a, b) {
+      return Number(a.getAttribute('data-midi')) - Number(b.getAttribute('data-midi'));
+    });
+
+    var midiMap = {};
+    var midiNotes = [];
+    var seen = {};
+    dots.forEach(function (d) {
+      var m = Number(d.getAttribute('data-midi'));
+      if (!midiMap[m]) midiMap[m] = [];
+      midiMap[m].push(d);
+      if (!seen[m]) {
+        seen[m] = true;
+        midiNotes.push(m);
+      }
+    });
+
+    return { midiNotes: midiNotes, midiMap: midiMap };
+  }
+
   function highlightNote(el) {
-    el._origFill = el.getAttribute('fill');
-    el._origOpacity = el.getAttribute('opacity');
-    el._origStroke = el.getAttribute('stroke');
-    el._origStrokeW = el.getAttribute('stroke-width');
+    // Guardar originales como atributos data- (más confiable en SVG que propiedades JS)
+    el.setAttribute('data-orig-fill', el.getAttribute('fill') || '');
+    el.setAttribute('data-orig-opacity', el.getAttribute('opacity') || '');
+    el.setAttribute('data-orig-r', el.getAttribute('r') || '');
+    // Aplicar highlight
     el.setAttribute('fill', '#ffe66d');
     el.setAttribute('opacity', '1');
     el.setAttribute('stroke', '#fff');
-    el.setAttribute('stroke-width', '2');
-    el.classList.add('note-playing');
+    el.setAttribute('stroke-width', '2.5');
+    // Agrandar el dot para forzar repaint geométrico
+    var origR = parseFloat(el.getAttribute('data-orig-r')) || 5;
+    el.setAttribute('r', String(origR + 3));
+    el.setAttribute('data-highlighted', '1');
   }
 
   function clearScaleHighlights() {
-    document.querySelectorAll('.note-playing').forEach(function (el) {
-      if (el._origFill != null) el.setAttribute('fill', el._origFill);
-      else el.removeAttribute('fill');
-      if (el._origOpacity != null) el.setAttribute('opacity', el._origOpacity);
-      else el.removeAttribute('opacity');
-      if (el._origStroke != null) el.setAttribute('stroke', el._origStroke);
-      else el.removeAttribute('stroke');
-      if (el._origStrokeW != null) el.setAttribute('stroke-width', el._origStrokeW);
-      else el.removeAttribute('stroke-width');
-      el.classList.remove('note-playing');
+    document.querySelectorAll('[data-highlighted="1"]').forEach(function (el) {
+      el.setAttribute('fill', el.getAttribute('data-orig-fill') || '#4ecdc4');
+      el.setAttribute('opacity', el.getAttribute('data-orig-opacity') || '0.45');
+      var origR = el.getAttribute('data-orig-r');
+      if (origR) el.setAttribute('r', origR);
+      el.removeAttribute('stroke');
+      el.removeAttribute('stroke-width');
+      el.removeAttribute('data-highlighted');
+      el.removeAttribute('data-orig-fill');
+      el.removeAttribute('data-orig-opacity');
+      el.removeAttribute('data-orig-r');
     });
   }
 
@@ -694,19 +712,8 @@
       var svg = zBody.querySelector('svg');
       if (!svg) return;
 
-      var dots = Array.from(svg.querySelectorAll('.scale-overlay [data-midi]'));
-      if (dots.length === 0) return;
-
-      dots.sort(function (a, b) { return Number(a.getAttribute('data-midi')) - Number(b.getAttribute('data-midi')); });
-      var seen = new Set();
-      var uniqueDots = dots.filter(function (d) {
-        var m = d.getAttribute('data-midi');
-        if (seen.has(m)) return false;
-        seen.add(m);
-        return true;
-      });
-      var midiNotes = uniqueDots.map(function (d) { return Number(d.getAttribute('data-midi')); });
-      if (midiNotes.length === 0) return;
+      var result = buildMidiMap(svg);
+      if (result.midiNotes.length === 0) return;
 
       var zTempo = document.getElementById('diagram-zoom-tempo');
       var interval = zTempo ? Number(zTempo.value) || 300 : 300;
@@ -715,12 +722,11 @@
       if (currentScalePlayback) { currentScalePlayback.stop(); currentScalePlayback = null; }
       clearScaleHighlights();
 
-      currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, function (noteIdx) {
+      currentScalePlayback = window.AudioEngine.playScale(result.midiNotes, interval, function (noteIdx) {
         clearScaleHighlights();
-        if (noteIdx >= 0 && noteIdx < midiNotes.length) {
-          var midi = midiNotes[noteIdx];
-          svg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
-            .forEach(function (el) { highlightNote(el); });
+        if (noteIdx >= 0 && noteIdx < result.midiNotes.length) {
+          var elems = result.midiMap[result.midiNotes[noteIdx]];
+          if (elems) elems.forEach(function (el) { highlightNote(el); });
         }
         if (noteIdx === -1) currentScalePlayback = null;
       });
