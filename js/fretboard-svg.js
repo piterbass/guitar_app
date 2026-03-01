@@ -110,13 +110,30 @@
       const barreY = CFG.padTop + (b.fret - startFret + 0.5) * CFG.fretSpacing;
       const x1 = CFG.padLeft + b.fromString * CFG.stringSpacing;
       const x2 = CFG.padLeft + b.toString * CFG.stringSpacing;
-      svg.appendChild(svgEl('rect', {
+      const barreRect = svgEl('rect', {
         x: x1 - CFG.dotRadius,
         y: barreY - CFG.dotRadius * 0.7,
         width: x2 - x1 + CFG.dotRadius * 2,
         height: CFG.dotRadius * 1.4,
         fill: '#333', rx: CFG.dotRadius * 0.7
-      }));
+      });
+      barreRect.style.cursor = 'pointer';
+      barreRect.addEventListener('click', (function (barre) {
+        return function (e) {
+          e.stopPropagation();
+          if (!window.AudioEngine) return;
+          // Determinar qué cuerda se tocó según posición X del click
+          var rect = e.target.getBoundingClientRect();
+          var clickX = e.clientX - rect.left;
+          var totalW = rect.width;
+          var numStrings = barre.toString - barre.fromString;
+          var stringIdx = Math.round((clickX / totalW) * numStrings) + barre.fromString;
+          stringIdx = Math.max(barre.fromString, Math.min(barre.toString, stringIdx));
+          var midi = STANDARD_TUNING[stringIdx] + barre.fret;
+          window.AudioEngine.playNote(midi);
+        };
+      })(b));
+      svg.appendChild(barreRect);
     }
 
     // Dots y markers por cada cuerda
