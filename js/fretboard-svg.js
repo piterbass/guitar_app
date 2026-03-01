@@ -171,7 +171,7 @@
           const fingerText = svgEl('text', {
             x: x, y: fingerY + 4,
             'text-anchor': 'middle', 'font-size': 9, 'font-weight': 'bold',
-            fill: '#fff'
+            fill: '#fff', 'pointer-events': 'none'
           });
           fingerText.textContent = voicing.fingers[s];
           svg.appendChild(fingerText);
@@ -366,6 +366,7 @@
             x: x, y: y + 3,
             'text-anchor': 'middle', 'font-size': 7, 'font-weight': 'bold',
             fill: st.textFill, opacity: st.opacity > 0.5 ? 1 : 0.7,
+            'pointer-events': 'none',
           });
           noteText.classList.add('scale-overlay');
           noteText.textContent = window.MusicTheory.pcToName(pc);
