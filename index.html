@@ -1075,50 +1075,53 @@
     /* ── Modal diagrama expandido ────────────────── */
     .diagram-zoom-content {
       max-width: 500px;
+      max-height: 95vh;
+      padding: 12px 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .diagram-zoom-content .modal-header {
+      margin-bottom: 6px;
     }
     .diagram-zoom-nav {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .diagram-zoom-nav .btn-small {
-      padding: 4px 10px;
-      font-size: 14px;
+      padding: 3px 8px;
+      font-size: 13px;
     }
     #diagram-zoom-counter {
       color: #aaa;
-      font-size: 13px;
-      min-width: 50px;
+      font-size: 12px;
+      min-width: 40px;
       text-align: center;
+    }
+    #diagram-zoom-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    #diagram-zoom-scale {
+      padding: 3px 6px;
+      font-size: 12px;
+      max-width: 180px;
     }
     #diagram-zoom-body {
       display: flex;
       justify-content: center;
+      flex: 1;
+      min-height: 0;
     }
     #diagram-zoom-body svg {
       width: 100%;
-      max-width: 450px;
+      max-height: 100%;
       height: auto;
-    }
-    #diagram-zoom-controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 12px;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    #diagram-zoom-scale {
-      padding: 4px 8px;
-      font-size: 13px;
-      max-width: 220px;
-    }
-    #diagram-zoom-audio {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 8px;
-      gap: 8px;
     }
 
     #voicing-picker-grid {
@@ -1576,22 +1579,20 @@
         </div>
         <button class="modal-close" id="diagram-zoom-close">&times;</button>
       </div>
-      <div id="diagram-zoom-body"></div>
-      <div id="diagram-zoom-controls">
+      <div id="diagram-zoom-toolbar">
         <select id="diagram-zoom-scale"></select>
-        <label style="color:#ccc; font-size:13px;">
+        <label style="color:#ccc; font-size:12px;">
           <input type="checkbox" id="diagram-zoom-targets" checked> Targets
         </label>
-      </div>
-      <div id="diagram-zoom-audio">
         <button id="diagram-zoom-play-chord" class="btn-small btn-play" title="Reproducir acorde">&#9654; Acorde</button>
         <button id="diagram-zoom-play-scale" class="btn-small btn-play" title="Reproducir escala">&#9654; Escala</button>
-        <select id="diagram-zoom-tempo" style="padding:4px 6px; font-size:12px;">
+        <select id="diagram-zoom-tempo" style="padding:3px 4px; font-size:11px;">
           <option value="500">Lento</option>
           <option value="300" selected>Normal</option>
           <option value="150">Rápido</option>
         </select>
       </div>
+      <div id="diagram-zoom-body"></div>
     </div>
   </div>
 
