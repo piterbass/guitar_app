@@ -22,7 +22,6 @@
   // En gestos posteriores solo se llama resume() (ligero, sin crear nodos).
   function onUserGesture() {
     var ac = getContext();
-    console.log('[Audio] gesture, state:', ac.state, 'unlocked:', unlocked);
     if (!unlocked) {
       var buf = ac.createBuffer(1, 1, ac.sampleRate);
       var src = ac.createBufferSource();
@@ -30,13 +29,8 @@
       src.connect(ac.destination);
       src.start(ac.currentTime);
       unlocked = true;
-      console.log('[Audio] unlock buffer played');
     }
-    if (ac.state === 'suspended') {
-      ac.resume().then(function () {
-        console.log('[Audio] resumed OK, state:', ac.state);
-      });
-    }
+    if (ac.state === 'suspended') ac.resume();
   }
   document.addEventListener('touchstart', onUserGesture, true);
   document.addEventListener('touchend', onUserGesture, true);
@@ -175,7 +169,6 @@
 
       return source;
     } catch (e) {
-      console.error('[Audio] chain error:', e.message);
       try {
         var src2 = ac.createBufferSource();
         src2.buffer = audioBuffer;
@@ -189,7 +182,7 @@
           if (j !== -1) activeSources.splice(j, 1);
         };
         return src2;
-      } catch (e2) { console.error('[Audio] fallback error:', e2.message); return null; }
+      } catch (e2) { return null; }
     }
   }
 
@@ -197,13 +190,10 @@
     if (midi == null) return;
     duration = duration || 3;
     var ac = getContext();
-    console.log('[Audio] playNote midi:', midi, 'state:', ac.state, 'currentTime:', ac.currentTime);
     if (ac.state === 'suspended') ac.resume();
     var freq = midiToFreq(midi);
     var audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
-    console.log('[Audio] buffer created, samples:', audioBuffer.length);
-    var src = createAudioChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
-    console.log('[Audio] chain created:', src ? 'OK' : 'FAIL');
+    createAudioChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
   }
 
   /**
