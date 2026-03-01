@@ -481,10 +481,9 @@
     currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, (noteIdx) => {
       clearScaleHighlights();
       if (noteIdx >= 0 && noteIdx < midiNotes.length) {
-        // Iluminar dots solo en el diagrama de referencia
         const midi = midiNotes[noteIdx];
         refSvg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
-          .forEach(el => el.classList.add('note-playing'));
+          .forEach(el => highlightNote(el));
       }
       if (noteIdx === -1) {
         currentScalePlayback = null;
@@ -492,8 +491,30 @@
     });
   }
 
+  function highlightNote(el) {
+    el._origFill = el.getAttribute('fill');
+    el._origOpacity = el.getAttribute('opacity');
+    el._origStroke = el.getAttribute('stroke');
+    el._origStrokeW = el.getAttribute('stroke-width');
+    el.setAttribute('fill', '#ffe66d');
+    el.setAttribute('opacity', '1');
+    el.setAttribute('stroke', '#fff');
+    el.setAttribute('stroke-width', '2');
+    el.classList.add('note-playing');
+  }
+
   function clearScaleHighlights() {
-    document.querySelectorAll('.note-playing').forEach(el => el.classList.remove('note-playing'));
+    document.querySelectorAll('.note-playing').forEach(function (el) {
+      if (el._origFill != null) el.setAttribute('fill', el._origFill);
+      else el.removeAttribute('fill');
+      if (el._origOpacity != null) el.setAttribute('opacity', el._origOpacity);
+      else el.removeAttribute('opacity');
+      if (el._origStroke != null) el.setAttribute('stroke', el._origStroke);
+      else el.removeAttribute('stroke');
+      if (el._origStrokeW != null) el.setAttribute('stroke-width', el._origStrokeW);
+      else el.removeAttribute('stroke-width');
+      el.classList.remove('note-playing');
+    });
   }
 
   // ── Vista Banco ─────────────────────────────────────────────
@@ -695,12 +716,11 @@
       clearScaleHighlights();
 
       currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, function (noteIdx) {
-        // Limpiar highlights en el modal
-        svg.querySelectorAll('.note-playing').forEach(function (el) { el.classList.remove('note-playing'); });
+        clearScaleHighlights();
         if (noteIdx >= 0 && noteIdx < midiNotes.length) {
           var midi = midiNotes[noteIdx];
           svg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
-            .forEach(function (el) { el.classList.add('note-playing'); });
+            .forEach(function (el) { highlightNote(el); });
         }
         if (noteIdx === -1) currentScalePlayback = null;
       });
