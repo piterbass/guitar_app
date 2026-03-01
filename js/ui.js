@@ -539,12 +539,181 @@
     elInfo.innerHTML = `<strong>Mis Acordes</strong> &mdash; ${total} voicing${total !== 1 ? 's' : ''} en ${names.length} acorde${names.length !== 1 ? 's' : ''}${query ? ' (filtrado)' : ''}`;
   }
 
+  // ── Modal de diagrama expandido ────────────────────────────
+
+  var zoomState = { cards: [], index: 0, chordName: '' };
+
+  function renderZoomDiagram() {
+    var body = document.getElementById('diagram-zoom-body');
+    var counter = document.getElementById('diagram-zoom-counter');
+    if (!body || zoomState.cards.length === 0) return;
+
+    var card = zoomState.cards[zoomState.index];
+    var voicing = card._voicing;
+
+    // Crear SVG expandido
+    var svg = createDiagram(voicing, zoomState.chordName);
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+
+    // Aplicar scale overlay según los controles del modal
+    var zoomScale = document.getElementById('diagram-zoom-scale');
+    var zoomTargets = document.getElementById('diagram-zoom-targets');
+    var scaleIdx = zoomScale ? zoomScale.value : '';
+    if (scaleIdx && currentScales[scaleIdx]) {
+      var scale = currentScales[scaleIdx];
+      var useTargets = zoomTargets ? zoomTargets.checked : showTargets;
+      var targetOpts = useTargets ? computeTargetOpts(currentChord, scale) : null;
+      addScaleOverlay(svg, voicing, scale.scalePCs, currentChordPCs, targetOpts);
+    }
+
+    body.innerHTML = '';
+    body.appendChild(svg);
+    if (counter) counter.textContent = (zoomState.index + 1) + ' / ' + zoomState.cards.length;
+  }
+
+  function openDiagramZoom(voicing, chordName) {
+    var modal = document.getElementById('diagram-zoom-modal');
+    var title = document.getElementById('diagram-zoom-title');
+    if (!modal) return;
+
+    // Recoger todas las cards visibles y encontrar el índice de la clickeada
+    var allCards = Array.from(elGrid.querySelectorAll('.voicing-card'));
+    zoomState.cards = allCards;
+    zoomState.chordName = chordName;
+    zoomState.index = allCards.findIndex(function (c) { return c._voicing === voicing; });
+    if (zoomState.index < 0) zoomState.index = 0;
+
+    if (title) title.textContent = chordName;
+
+    // Sincronizar scale select del modal con el principal
+    syncZoomScaleSelect();
+
+    renderZoomDiagram();
+    modal.style.display = 'flex';
+  }
+
+  function syncZoomScaleSelect() {
+    var zoomScale = document.getElementById('diagram-zoom-scale');
+    if (!zoomScale) return;
+    // Copiar opciones del select principal
+    zoomScale.innerHTML = elScaleSelect.innerHTML;
+    zoomScale.value = elScaleSelect.value;
+  }
+
+  function closeDiagramZoom() {
+    var modal = document.getElementById('diagram-zoom-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  // Inicializar eventos del modal
+  document.addEventListener('DOMContentLoaded', function () {
+    var closeBtn = document.getElementById('diagram-zoom-close');
+    var modal = document.getElementById('diagram-zoom-modal');
+    var prevBtn = document.getElementById('diagram-zoom-prev');
+    var nextBtn = document.getElementById('diagram-zoom-next');
+    var zoomScale = document.getElementById('diagram-zoom-scale');
+    var zoomTargets = document.getElementById('diagram-zoom-targets');
+    var zoomPlay = document.getElementById('diagram-zoom-play');
+
+    if (closeBtn) closeBtn.addEventListener('click', closeDiagramZoom);
+    if (modal) modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeDiagramZoom();
+    });
+
+    if (prevBtn) prevBtn.addEventListener('click', function () {
+      if (zoomState.index > 0) {
+        zoomState.index--;
+        // Actualizar nombre si cambió de grupo
+        var card = zoomState.cards[zoomState.index];
+        if (card && card._chordName) zoomState.chordName = card._chordName;
+        renderZoomDiagram();
+      }
+    });
+    if (nextBtn) nextBtn.addEventListener('click', function () {
+      if (zoomState.index < zoomState.cards.length - 1) {
+        zoomState.index++;
+        var card = zoomState.cards[zoomState.index];
+        if (card && card._chordName) zoomState.chordName = card._chordName;
+        renderZoomDiagram();
+      }
+    });
+
+    // Cambiar escala en el modal → re-renderizar + sincronizar con principal
+    if (zoomScale) zoomScale.addEventListener('change', function () {
+      elScaleSelect.value = zoomScale.value;
+      applyScaleOverlay(); // actualizar vista principal
+      renderZoomDiagram();
+    });
+
+    // Toggle targets en modal
+    if (zoomTargets) zoomTargets.addEventListener('change', function () {
+      renderZoomDiagram();
+    });
+
+    // Play acorde
+    var zoomPlayChord = document.getElementById('diagram-zoom-play-chord');
+    if (zoomPlayChord) zoomPlayChord.addEventListener('click', function () {
+      if (!window.AudioEngine || zoomState.cards.length === 0) return;
+      var card = zoomState.cards[zoomState.index];
+      if (!card || !card._voicing) return;
+      var { STANDARD_TUNING } = window.MusicTheory;
+      var midiNotes = card._voicing.frets.map(function (f, i) {
+        return f === -1 ? null : STANDARD_TUNING[i] + f;
+      });
+      window.AudioEngine.playChord(midiNotes);
+    });
+
+    // Play escala sobre el diagrama expandido
+    var zoomPlayScale = document.getElementById('diagram-zoom-play-scale');
+    if (zoomPlayScale) zoomPlayScale.addEventListener('click', function () {
+      if (!window.AudioEngine) return;
+      var zBody = document.getElementById('diagram-zoom-body');
+      if (!zBody) return;
+      var svg = zBody.querySelector('svg');
+      if (!svg) return;
+
+      var dots = Array.from(svg.querySelectorAll('.scale-overlay [data-midi]'));
+      if (dots.length === 0) return;
+
+      dots.sort(function (a, b) { return Number(a.getAttribute('data-midi')) - Number(b.getAttribute('data-midi')); });
+      var seen = new Set();
+      var uniqueDots = dots.filter(function (d) {
+        var m = d.getAttribute('data-midi');
+        if (seen.has(m)) return false;
+        seen.add(m);
+        return true;
+      });
+      var midiNotes = uniqueDots.map(function (d) { return Number(d.getAttribute('data-midi')); });
+      if (midiNotes.length === 0) return;
+
+      var zTempo = document.getElementById('diagram-zoom-tempo');
+      var interval = zTempo ? Number(zTempo.value) || 300 : 300;
+
+      // Detener reproducción anterior
+      if (currentScalePlayback) { currentScalePlayback.stop(); currentScalePlayback = null; }
+      clearScaleHighlights();
+
+      currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, function (noteIdx) {
+        // Limpiar highlights en el modal
+        svg.querySelectorAll('.note-playing').forEach(function (el) { el.classList.remove('note-playing'); });
+        if (noteIdx >= 0 && noteIdx < midiNotes.length) {
+          var midi = midiNotes[noteIdx];
+          svg.querySelectorAll('.scale-overlay [data-midi="' + midi + '"]')
+            .forEach(function (el) { el.classList.add('note-playing'); });
+        }
+        if (noteIdx === -1) currentScalePlayback = null;
+      });
+    });
+  });
+
   // ── Crear card de voicing ───────────────────────────────────
 
   function createVoicingCard(voicing, chordName, opts) {
     const card = document.createElement('div');
     card.className = 'voicing-card';
     card._voicing = voicing; // Guardar referencia para scale overlay
+    card._chordName = chordName;
     if (opts.badge) card.classList.add('personal');
 
     const svgOpts = opts.badge ? { badge: opts.badge } : {};
@@ -623,6 +792,12 @@
     actions.appendChild(scaleRefBtn);
 
     card.appendChild(actions);
+
+    // Click en la card (no en botones) → abrir modal expandido
+    card.addEventListener('click', function () {
+      openDiagramZoom(voicing, chordName);
+    });
+
     return card;
   }
 

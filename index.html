@@ -1072,6 +1072,55 @@
       color: #fff;
     }
 
+    /* ── Modal diagrama expandido ────────────────── */
+    .diagram-zoom-content {
+      max-width: 500px;
+    }
+    .diagram-zoom-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .diagram-zoom-nav .btn-small {
+      padding: 4px 10px;
+      font-size: 14px;
+    }
+    #diagram-zoom-counter {
+      color: #aaa;
+      font-size: 13px;
+      min-width: 50px;
+      text-align: center;
+    }
+    #diagram-zoom-body {
+      display: flex;
+      justify-content: center;
+    }
+    #diagram-zoom-body svg {
+      width: 100%;
+      max-width: 450px;
+      height: auto;
+    }
+    #diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #diagram-zoom-scale {
+      padding: 4px 8px;
+      font-size: 13px;
+      max-width: 220px;
+    }
+    #diagram-zoom-audio {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 8px;
+      gap: 8px;
+    }
+
     #voicing-picker-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -1514,6 +1563,37 @@
       <div id="view-pinned-bar"></div>
     </div>
   </section>
+
+  <!-- ════ Modal: Diagrama expandido ════ -->
+  <div class="modal-overlay" id="diagram-zoom-modal">
+    <div class="modal-content diagram-zoom-content">
+      <div class="modal-header">
+        <h3 id="diagram-zoom-title"></h3>
+        <div class="diagram-zoom-nav">
+          <button id="diagram-zoom-prev" class="btn-small" title="Voicing anterior">&#9664;</button>
+          <span id="diagram-zoom-counter"></span>
+          <button id="diagram-zoom-next" class="btn-small" title="Siguiente voicing">&#9654;</button>
+        </div>
+        <button class="modal-close" id="diagram-zoom-close">&times;</button>
+      </div>
+      <div id="diagram-zoom-body"></div>
+      <div id="diagram-zoom-controls">
+        <select id="diagram-zoom-scale"></select>
+        <label style="color:#ccc; font-size:13px;">
+          <input type="checkbox" id="diagram-zoom-targets" checked> Targets
+        </label>
+      </div>
+      <div id="diagram-zoom-audio">
+        <button id="diagram-zoom-play-chord" class="btn-small btn-play" title="Reproducir acorde">&#9654; Acorde</button>
+        <button id="diagram-zoom-play-scale" class="btn-small btn-play" title="Reproducir escala">&#9654; Escala</button>
+        <select id="diagram-zoom-tempo" style="padding:4px 6px; font-size:12px;">
+          <option value="500">Lento</option>
+          <option value="300" selected>Normal</option>
+          <option value="150">Rápido</option>
+        </select>
+      </div>
+    </div>
+  </div>
 
   <!-- ════ Modal: Voicing Picker ════ -->
   <div class="modal-overlay" id="voicing-picker-modal">
