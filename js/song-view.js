@@ -77,10 +77,11 @@
       ? window.ScaleDetector.scoredCompatibleScales(chord.pitchClasses, chord.rootPc, chord.intervals)
       : [];
 
-    // Construir mapa de escalas fijadas desde los pinnedVoicings de la canción
+    // Re-leer canción fresca desde storage (puede haber sido modificada por el botón fijar)
+    const freshSong = SB.getSong(currentSongId);
     const fixedScales = {};
-    if (currentSong && currentSong.pinnedVoicings) {
-      currentSong.pinnedVoicings.forEach(function (pv) {
+    if (freshSong && freshSong.pinnedVoicings) {
+      freshSong.pinnedVoicings.forEach(function (pv) {
         if (pv.fixedScale) fixedScales[pv.chord] = pv.fixedScale;
       });
     }
