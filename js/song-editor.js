@@ -177,6 +177,10 @@
       } else {
         pinnedVoicings.push({ chord: chordName, frets: [...frets] });
         card.classList.add('pinned');
+        // Flash de confirmación
+        card.classList.remove('pin-flash');
+        void card.offsetWidth; // force reflow
+        card.classList.add('pin-flash');
       }
       renderPinnedVoicings();
     });
