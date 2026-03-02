@@ -886,6 +886,19 @@
 
     .pinned-card {
       max-width: 140px;
+      cursor: grab;
+      transition: opacity 0.2s, border-color 0.2s, transform 0.15s;
+    }
+
+    .pinned-card.dragging {
+      opacity: 0.4;
+      cursor: grabbing;
+    }
+
+    .pinned-card.drag-over {
+      border-color: #ffe66d;
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 230, 109, 0.5);
     }
 
     /* ── Vista de canción ─────────────────────────── */

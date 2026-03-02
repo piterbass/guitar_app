@@ -197,6 +197,8 @@
       const voicing = bankEntryToVoicing({ frets: pv.frets });
       const card = document.createElement('div');
       card.className = 'voicing-card pinned-card';
+      card.dataset.pinIdx = idx;
+      card.draggable = true;
       card.appendChild(createDiagram(voicing, pv.chord));
 
       // Botón quitar
@@ -216,6 +218,155 @@
 
       container.appendChild(card);
     });
+
+    // Drag & drop (desktop + mobile touch)
+    initDragAndDrop(container);
+  }
+
+  // ── Drag & Drop reordering ──────────────────────────────────
+
+  let dragSrcIdx = null;
+
+  function initDragAndDrop(container) {
+    const cards = container.querySelectorAll('.pinned-card');
+
+    cards.forEach(card => {
+      // Desktop drag events
+      card.addEventListener('dragstart', onDragStart);
+      card.addEventListener('dragover', onDragOver);
+      card.addEventListener('drop', onDrop);
+      card.addEventListener('dragend', onDragEnd);
+
+      // Mobile touch events
+      card.addEventListener('touchstart', onTouchStart, { passive: false });
+      card.addEventListener('touchmove', onTouchMove, { passive: false });
+      card.addEventListener('touchend', onTouchEnd);
+    });
+  }
+
+  function onDragStart(e) {
+    dragSrcIdx = Number(this.dataset.pinIdx);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    const targetIdx = Number(this.dataset.pinIdx);
+    if (dragSrcIdx !== null && dragSrcIdx !== targetIdx) {
+      const item = pinnedVoicings.splice(dragSrcIdx, 1)[0];
+      pinnedVoicings.splice(targetIdx, 0, item);
+      renderPinnedVoicings();
+    }
+  }
+
+  function onDragEnd() {
+    document.querySelectorAll('.pinned-card').forEach(c => {
+      c.classList.remove('dragging', 'drag-over');
+    });
+    dragSrcIdx = null;
+  }
+
+  // Mobile touch-based drag
+  let touchCard = null;
+  let touchClone = null;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchMoved = false;
+  let longPressTimer = null;
+
+  function onTouchStart(e) {
+    const card = e.currentTarget;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchMoved = false;
+
+    // Long press to initiate drag
+    longPressTimer = setTimeout(() => {
+      touchCard = card;
+      dragSrcIdx = Number(card.dataset.pinIdx);
+      card.classList.add('dragging');
+
+      // Crear clon visual
+      touchClone = card.cloneNode(true);
+      touchClone.classList.add('drag-clone');
+      touchClone.style.cssText = 'position:fixed;z-index:10000;opacity:0.8;pointer-events:none;width:' + card.offsetWidth + 'px;';
+      touchClone.style.left = (touchStartX - card.offsetWidth / 2) + 'px';
+      touchClone.style.top = (touchStartY - card.offsetHeight / 2) + 'px';
+      document.body.appendChild(touchClone);
+
+      touchMoved = true;
+    }, 300);
+  }
+
+  function onTouchMove(e) {
+    if (!touchCard) {
+      // Si se mueve antes del long press, cancelar
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        clearTimeout(longPressTimer);
+      }
+      return;
+    }
+
+    e.preventDefault();
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+
+    if (touchClone) {
+      touchClone.style.left = (x - touchClone.offsetWidth / 2) + 'px';
+      touchClone.style.top = (y - touchClone.offsetHeight / 2) + 'px';
+    }
+
+    // Resaltar card debajo del dedo
+    document.querySelectorAll('.pinned-card').forEach(c => c.classList.remove('drag-over'));
+    const elemBelow = document.elementFromPoint(x, y);
+    if (elemBelow) {
+      const targetCard = elemBelow.closest('.pinned-card');
+      if (targetCard && targetCard !== touchCard) {
+        targetCard.classList.add('drag-over');
+      }
+    }
+  }
+
+  function onTouchEnd(e) {
+    clearTimeout(longPressTimer);
+
+    if (!touchCard) return;
+
+    // Encontrar card destino
+    const lastTouch = e.changedTouches[0];
+    const elemBelow = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+    const targetCard = elemBelow ? elemBelow.closest('.pinned-card') : null;
+
+    if (targetCard && targetCard !== touchCard) {
+      const targetIdx = Number(targetCard.dataset.pinIdx);
+      if (dragSrcIdx !== null && dragSrcIdx !== targetIdx) {
+        const item = pinnedVoicings.splice(dragSrcIdx, 1)[0];
+        pinnedVoicings.splice(targetIdx, 0, item);
+      }
+    }
+
+    // Cleanup
+    if (touchClone && touchClone.parentNode) {
+      touchClone.parentNode.removeChild(touchClone);
+    }
+    document.querySelectorAll('.pinned-card').forEach(c => {
+      c.classList.remove('dragging', 'drag-over');
+    });
+    touchCard = null;
+    touchClone = null;
+    dragSrcIdx = null;
+
+    renderPinnedVoicings();
   }
 
   function save() {
