@@ -477,12 +477,12 @@
     const position = {
       index: 0,
       label: 'Diapasón completo',
-      fretRange: [0, 15],
+      fretRange: [0, 22],
       noteData: [],
     };
 
     for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
-      for (let fret = 0; fret <= 15; fret++) {
+      for (let fret = 0; fret <= 22; fret++) {
         const pc = fretToPC(stringIdx, fret);
         const degIdx = semitones.findIndex(s => (rootPc + s) % 12 === pc);
         if (degIdx === -1) continue;

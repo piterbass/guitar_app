@@ -1,13 +1,15 @@
 // ============================================================
 // full-fretboard-svg.js  –  Diapasón completo SVG (horizontal)
-// Renderiza el mástil de guitarra completo (0-15 trastes)
+// Renderiza el mástil de guitarra completo (0-22 trastes)
+// Vista: 1ª cuerda (e aguda) arriba, 6ª cuerda (E grave) abajo
+// (perspectiva del guitarrista mirando el mástil desde arriba)
 // ============================================================
 
 (function () {
   const { STANDARD_TUNING, STRING_NAMES, fretToPC, pcToName } = window.MusicTheory;
 
   const NUM_STRINGS = 6;
-  const MAX_FRET = 15;
+  const MAX_FRET = 22;
 
   // Dimensiones del diapasón
   const CFG = {
@@ -16,20 +18,21 @@
     padLeft: 28,
     padRight: 14,
     stringSpacing: 26,
-    fretSpacing: 52,
-    dotRadius: 10,
-    hitRadius: 14,
-    fontSize: 9,
+    fretSpacing: 44,
+    dotRadius: 9,
+    hitRadius: 13,
+    fontSize: 8,
     nutWidth: 5,
   };
 
   // Trastes con inlay dots
-  const INLAY_FRETS = [3, 5, 7, 9, 15];
-  const DOUBLE_INLAY = [12];
+  const INLAY_FRETS = [3, 5, 7, 9, 15, 17, 19, 21];
+  const DOUBLE_INLAY = [12, 24];
 
   // Colores
   const COLORS = {
     root: '#e94560',
+    rootDim: 'rgba(233, 69, 96, 0.35)',
     triad: '#4ecdc4',
     scale: '#7a8a9a',
     dimmed: 'rgba(120, 140, 160, 0.18)',
@@ -47,6 +50,14 @@
       el.setAttribute(k, String(v));
     }
     return el;
+  }
+
+  /**
+   * Convierte índice de cuerda (0=6ª E grave) a posición Y en el SVG.
+   * Invertido: cuerda 0 (grave) va abajo, cuerda 5 (aguda) va arriba.
+   */
+  function stringToY(s) {
+    return CFG.padTop + (NUM_STRINGS - 1 - s) * CFG.stringSpacing;
   }
 
   /**
@@ -130,15 +141,19 @@
     }
 
     // ── Cuerdas (líneas horizontales) ──
+    // s=0 es 6ª cuerda (grave), se dibuja abajo; s=5 es 1ª cuerda (aguda), arriba
     for (let s = 0; s < NUM_STRINGS; s++) {
-      const y = CFG.padTop + s * CFG.stringSpacing;
-      const sw = 0.8 + (NUM_STRINGS - 1 - s) * 0.25; // graves más gruesas
+      const y = stringToY(s);
+      const sw = 0.8 + s * 0.25; // s=0 (1ª, aguda, arriba) fina, s=5 (6ª, grave, abajo) gruesa
+      // Nota: s en el loop es visual (0=top), pero stringToY invierte,
+      // así que s=0 (6ª grave) va abajo con grosor basado en posición real
+      const thickness = 0.8 + (NUM_STRINGS - 1 - s) * 0.25;
       svg.appendChild(svgEl('line', {
         x1: CFG.padLeft,
         y1: y,
         x2: CFG.padLeft + (numFrets + 1) * CFG.fretSpacing,
         y2: y,
-        stroke: '#666', 'stroke-width': sw,
+        stroke: '#666', 'stroke-width': thickness,
       }));
 
       // Nombre de cuerda
@@ -192,26 +207,27 @@
         const isInPosition = positionSet.has(s + ',' + f);
         const isRoot = pc === rootPc;
 
-        // Si solo mostrar posición y esta nota no está en posición, skip o dim
+        // Si solo mostrar posición y esta nota no está en posición, skip
         if (!showFullScale && !isInPosition) continue;
 
         const x = CFG.padLeft + f * CFG.fretSpacing;
-        const y = CFG.padTop + s * CFG.stringSpacing;
+        const y = stringToY(s);
         const midi = STANDARD_TUNING[s] + f;
 
-        // Determinar estilo
+        // Determinar estilo – root siempre tiene prioridad visual
         let fill, opacity, radius;
-        if (!isInPosition && showFullScale) {
-          // Nota fuera de posición (dimmed)
+        if (isRoot) {
+          // Root siempre en rojo (fuerte si en posición, tenue si fuera)
+          fill = isInPosition ? COLORS.root : COLORS.rootDim;
+          opacity = 1;
+          radius = isInPosition ? CFG.dotRadius : CFG.dotRadius - 2;
+        } else if (!isInPosition && showFullScale) {
+          // Nota de escala fuera de posición (dimmed)
           fill = COLORS.dimmed;
           opacity = 1;
           radius = CFG.dotRadius - 2;
-        } else if (isRoot) {
-          fill = COLORS.root;
-          opacity = 1;
-          radius = CFG.dotRadius;
         } else {
-          // Buscar si es tríada
+          // Nota en posición: tríada o escala
           const noteInfo = positionNotes
             ? positionNotes.find(n => n.string === s && n.fret === f)
             : null;
@@ -245,14 +261,14 @@
         });
         notesGroup.appendChild(dot);
 
-        // Borde extra para root
+        // Borde extra para root en posición
         if (isRoot && isInPosition) {
           dot.setAttribute('stroke', '#fff');
           dot.setAttribute('stroke-width', '2');
         }
 
-        // Etiqueta de texto
-        if (isInPosition || (isRoot && showFullScale)) {
+        // Etiqueta de texto (en posición, o root siempre)
+        if (isInPosition || isRoot) {
           let labelText;
           if (showIntervals) {
             const noteInfo = positionNotes
@@ -264,11 +280,13 @@
           }
 
           const text = svgEl('text', {
-            x: x, y: y + 3.5,
+            x: x, y: y + 3,
             'text-anchor': 'middle',
             'font-size': CFG.fontSize,
             'font-weight': 'bold',
-            fill: isRoot ? '#fff' : (fill === COLORS.dimmed ? '#666' : '#fff'),
+            fill: (isRoot && isInPosition) ? '#fff'
+              : isRoot ? 'rgba(255,255,255,0.5)'
+              : (fill === COLORS.dimmed ? '#666' : '#fff'),
             'pointer-events': 'none',
           });
           text.textContent = labelText;
@@ -310,14 +328,13 @@
       dot.removeAttribute('data-orig-fill');
       dot.removeAttribute('data-orig-r');
       // Restaurar borde
-      const midi = parseInt(dot.getAttribute('data-midi'));
-      const isRoot = dot.getAttribute('fill') === COLORS.root;
-      if (!isRoot) {
-        dot.removeAttribute('stroke');
-        dot.removeAttribute('stroke-width');
-      } else {
+      const origFill = dot.getAttribute('fill');
+      if (origFill === COLORS.root) {
         dot.setAttribute('stroke', '#fff');
         dot.setAttribute('stroke-width', '2');
+      } else {
+        dot.removeAttribute('stroke');
+        dot.removeAttribute('stroke-width');
       }
     });
   }
