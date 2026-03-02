@@ -42,6 +42,8 @@
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     if (sectionName === 'chords') {
       document.getElementById('nav-chords').classList.add('active');
+    } else if (sectionName === 'scales') {
+      document.getElementById('nav-scales').classList.add('active');
     } else if (sectionName === 'songs' || sectionName === 'song-edit' || sectionName === 'song-view') {
       document.getElementById('nav-songs').classList.add('active');
     }
@@ -160,6 +162,7 @@
 
     // Nav principal
     document.getElementById('nav-chords').addEventListener('click', () => showSection('chords'));
+    document.getElementById('nav-scales').addEventListener('click', () => showSection('scales'));
     document.getElementById('nav-songs').addEventListener('click', () => {
       window.SongListView.render();
       showSection('songs');
