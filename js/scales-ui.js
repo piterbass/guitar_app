@@ -15,6 +15,7 @@
   let elPositionLabel, elPrevBtn, elNextBtn, elPositionDots;
   let elShowFull, elShowIntervals, elDirection;
   let elPlayPosition, elPlayFull, elTempo;
+  let elFlipStrings;
   let elTabExplore, elTabBank, elExplorePanel, elBankPanel, elBankCount;
   let elBankList, elBankExport, elBankImport, elBankFile;
 
@@ -94,6 +95,7 @@
     elBankPanel = document.getElementById('scales-bank-panel');
     elBankCount = document.getElementById('scales-bank-count');
     elBankList = document.getElementById('scales-bank-list');
+    elFlipStrings = document.getElementById('scales-flip-strings');
     elBankExport = document.getElementById('scales-bank-export');
     elBankImport = document.getElementById('scales-bank-import');
     elBankFile = document.getElementById('scales-bank-file');
@@ -122,6 +124,12 @@
     });
     elDirection.addEventListener('change', () => {
       state.direction = elDirection.value;
+    });
+    elFlipStrings.addEventListener('click', () => {
+      const current = FB.getFlip();
+      FB.setFlip(!current);
+      elFlipStrings.classList.toggle('active', !current);
+      renderFretboard();
     });
 
     // Events - audio
@@ -301,7 +309,7 @@
     // Todas las notas de la escala en el diapasón, ordenadas por altura
     const notes = [];
     for (let s = 0; s < 6; s++) {
-      for (let f = 0; f <= 15; f++) {
+      for (let f = 0; f <= 22; f++) {
         const pc = fretToPC(s, f);
         if (state.scalePCs.includes(pc)) {
           notes.push({ midi: STANDARD_TUNING[s] + f, string: s, fret: f });

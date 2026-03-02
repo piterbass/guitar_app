@@ -52,11 +52,18 @@
     return el;
   }
 
+  // Default: 6ª (grave) abajo, 1ª (aguda) arriba (perspectiva guitarrista)
+  let flipStrings = false;
+
   /**
    * Convierte índice de cuerda (0=6ª E grave) a posición Y en el SVG.
-   * Invertido: cuerda 0 (grave) va abajo, cuerda 5 (aguda) va arriba.
+   * Normal (flipStrings=false): cuerda 0 (grave) va abajo, cuerda 5 (aguda) va arriba.
+   * Invertido (flipStrings=true): cuerda 0 (grave) va arriba, cuerda 5 (aguda) va abajo.
    */
   function stringToY(s) {
+    if (flipStrings) {
+      return CFG.padTop + s * CFG.stringSpacing;
+    }
     return CFG.padTop + (NUM_STRINGS - 1 - s) * CFG.stringSpacing;
   }
 
@@ -76,8 +83,11 @@
     const {
       rootPc, scalePCs, positionNotes, fretRange,
       showFullScale = true, showIntervals = false,
-      onNoteClick
+      onNoteClick, flip
     } = opts;
+
+    // Actualizar estado de inversión si se pasa explícitamente
+    if (flip !== undefined) flipStrings = flip;
 
     const numFrets = MAX_FRET;
     const totalW = CFG.padLeft + (numFrets + 1) * CFG.fretSpacing + CFG.padRight;
@@ -339,5 +349,8 @@
     });
   }
 
-  window.FullFretboardSVG = { createFullFretboard, highlightNoteMidi, clearHighlights };
+  function setFlip(val) { flipStrings = !!val; }
+  function getFlip() { return flipStrings; }
+
+  window.FullFretboardSVG = { createFullFretboard, highlightNoteMidi, clearHighlights, setFlip, getFlip };
 })();

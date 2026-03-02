@@ -108,6 +108,7 @@
   /**
    * Genera 7 posiciones 3NPS para una escala de 7 notas.
    * Cada posición asigna 3 notas consecutivas de la escala a cada cuerda.
+   * Las posiciones cubren todo el diapasón desde traste 0 hacia arriba.
    */
   function generate3NPSPositions(rootPc, scaleKey) {
     const formula = SCALE_FORMULAS[scaleKey];
@@ -118,40 +119,13 @@
     const positions = [];
 
     for (let startDegree = 0; startDegree < numDegrees; startDegree++) {
-      const position = {
-        index: startDegree,
-        label: startDegree === 0 ? 'Pos 1 (Raíz)' : `Pos ${startDegree + 1}`,
-        fretRange: [0, 0],
-        noteData: [],
-      };
+      // Encontrar el traste más bajo en la 6ª cuerda donde cae este grado
+      const firstPc = (rootPc + semitones[startDegree]) % 12;
+      const openPc6 = STANDARD_TUNING[0] % 12;
+      const startFret = ((firstPc - openPc6) % 12 + 12) % 12;
+      const centerFret = startFret + 2;
 
-      // Primero: encontrar el traste de la nota de inicio en la 6ª cuerda
-      // para establecer el centro de la posición
-      const firstDegree = startDegree % numDegrees;
-      const firstPc = (rootPc + semitones[firstDegree]) % 12;
-      const openMidi6 = STANDARD_TUNING[0];
-      const openPc6 = openMidi6 % 12;
-      let startFret = ((firstPc - openPc6) % 12 + 12) % 12;
-
-      // Si el startFret es 0 o 1, intenta empezar un poco más arriba para variedad
-      // excepto para la posición 1 que puede empezar abierta
-      if (startDegree > 0 && startFret < 2) {
-        startFret += 12;
-      }
-
-      // Ajustar: buscar que todas las posiciones estén progresivamente más arriba
-      if (startDegree > 0 && positions.length > 0) {
-        const prevStart = positions[positions.length - 1].fretRange[0];
-        while (startFret <= prevStart && startFret + 12 <= 20) {
-          startFret += 12;
-        }
-        // Si se fue muy lejos, volver atrás
-        if (startFret > 17) {
-          startFret -= 12;
-        }
-      }
-
-      const centerFret = startFret + 2; // centro aproximado de la posición
+      const noteData = [];
 
       // Asignar 3 notas por cuerda
       for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
@@ -159,20 +133,15 @@
 
         for (let n = 0; n < 3; n++) {
           const degree = (degreeOffset + n) % numDegrees;
-          const octaveShift = Math.floor((degreeOffset + n) / numDegrees);
-          const semitoneFromRoot = semitones[degree];
-          const targetPc = (rootPc + semitoneFromRoot) % 12;
+          const targetPc = (rootPc + semitones[degree]) % 12;
 
-          // Encontrar traste óptimo
           const fret = bestFretForPC(stringIdx, targetPc, centerFret, 6);
           if (fret === null || fret > 24) continue;
 
-          const midi = STANDARD_TUNING[stringIdx] + fret;
-
-          position.noteData.push({
+          noteData.push({
             string: stringIdx,
             fret: fret,
-            midi: midi,
+            midi: STANDARD_TUNING[stringIdx] + fret,
             pc: targetPc,
             interval: formula[degree],
             isRoot: degree === 0,
@@ -181,21 +150,19 @@
         }
       }
 
-      // Calcular rango de trastes
-      const allFrets = position.noteData.map(n => n.fret).filter(f => f > 0);
-      if (allFrets.length > 0) {
-        position.fretRange = [Math.min(...allFrets), Math.max(...allFrets)];
-      } else {
-        position.fretRange = [0, 4];
-      }
+      // Calcular rango de trastes (incluir traste 0)
+      const allFrets = noteData.map(n => n.fret);
+      const fretRange = allFrets.length > 0
+        ? [Math.min(...allFrets), Math.max(...allFrets)]
+        : [0, 4];
 
-      positions.push(position);
+      positions.push({ index: startDegree, label: '', fretRange, noteData });
     }
 
-    // Ordenar posiciones por fretRange[0] ascendente para progresión lógica
+    // Ordenar posiciones por traste más bajo → progresión natural por el mástil
     positions.sort((a, b) => a.fretRange[0] - b.fretRange[0]);
 
-    // Re-indexar y re-etiquetar tras ordenar
+    // Re-indexar y etiquetar
     const rootPositionIdx = positions.findIndex(p =>
       p.noteData.some(n => n.isRoot && n.string === 0)
     );
@@ -236,14 +203,6 @@
       const firstPc = (rootPc + semitones[startDegree % numDegrees]) % 12;
       const openPc6 = STANDARD_TUNING[0] % 12;
       let startFret = ((firstPc - openPc6) % 12 + 12) % 12;
-
-      if (startDegree > 0 && startFret < 2) startFret += 12;
-      if (startDegree > 0 && positions.length > 0) {
-        const prevStart = positions[positions.length - 1].fretRange[0];
-        while (startFret <= prevStart && startFret + 12 <= 20) startFret += 12;
-        if (startFret > 17) startFret -= 12;
-      }
-
       const centerFret = startFret + 2;
 
       // 2 notas por cuerda para pentatónicas
@@ -272,7 +231,7 @@
         }
       }
 
-      const allFrets = position.noteData.map(n => n.fret).filter(f => f > 0);
+      const allFrets = position.noteData.map(n => n.fret);
       if (allFrets.length > 0) {
         position.fretRange = [Math.min(...allFrets), Math.max(...allFrets)];
       } else {
@@ -321,14 +280,6 @@
       const firstPc = (rootPc + semitones[startDeg % semitones.length]) % 12;
       const openPc6 = STANDARD_TUNING[0] % 12;
       let startFret = ((firstPc - openPc6) % 12 + 12) % 12;
-
-      if (startDeg > 0 && startFret < 2) startFret += 12;
-      if (startDeg > 0 && positions.length > 0) {
-        const prevStart = positions[positions.length - 1].fretRange[0];
-        while (startFret <= prevStart && startFret + 12 <= 20) startFret += 12;
-        if (startFret > 17) startFret -= 12;
-      }
-
       const minF = Math.max(0, startFret - 1);
       const maxF = startFret + 4;
 
@@ -364,7 +315,7 @@
       // Ordenar por cuerda, luego por traste
       position.noteData.sort((a, b) => a.string - b.string || a.fret - b.fret);
 
-      const allFrets = position.noteData.map(n => n.fret).filter(f => f > 0);
+      const allFrets = position.noteData.map(n => n.fret);
       if (allFrets.length > 0) {
         position.fretRange = [Math.min(...allFrets), Math.max(...allFrets)];
       } else {

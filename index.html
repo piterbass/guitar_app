@@ -1362,6 +1362,16 @@
       accent-color: #4ecdc4;
     }
 
+    #scales-flip-strings {
+      background: #333;
+      font-size: 11px;
+      padding: 3px 8px;
+    }
+    #scales-flip-strings.active {
+      background: #4ecdc4;
+      color: #000;
+    }
+
     .scales-audio-controls {
       display: flex;
       gap: 8px;
@@ -1884,6 +1894,7 @@
           <label class="toggle-label">
             <input type="checkbox" id="scales-show-intervals"> Intervalos
           </label>
+          <button id="scales-flip-strings" class="btn-small" title="Invertir cuerdas" style="font-size:11px; padding:3px 8px;">&#8597; Cuerdas</button>
           <select id="scales-direction" style="padding:4px 6px; font-size:12px;">
             <option value="ascending">Ascendente</option>
             <option value="descending">Descendente</option>
