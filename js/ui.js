@@ -434,15 +434,33 @@
    * una octava desde la raíz más grave posible en guitarra) e ilumina los
    * dots correspondientes en TODOS los diagramas visibles.
    */
-  function playCurrentScale() {
-    if (!window.AudioEngine) return;
-
-    // Detener reproducción anterior
+  function stopCurrentScale() {
     if (currentScalePlayback) {
       currentScalePlayback.stop();
       currentScalePlayback = null;
     }
     clearScaleHighlights();
+    resetScaleBtn();
+  }
+
+  function resetScaleBtn() {
+    if (elPlayScaleBtn) elPlayScaleBtn.innerHTML = '&#9654; Escala';
+    var zoomBtn = document.getElementById('diagram-zoom-play-scale');
+    if (zoomBtn) zoomBtn.innerHTML = '&#9654; Escala';
+  }
+
+  function setScaleBtnStop(btn) {
+    if (btn) btn.innerHTML = '&#9724; Stop';
+  }
+
+  function playCurrentScale() {
+    if (!window.AudioEngine) return;
+
+    // Si ya está reproduciendo → detener (toggle)
+    if (currentScalePlayback) {
+      stopCurrentScale();
+      return;
+    }
 
     const idx = elScaleSelect.value;
     if (!idx || !currentScales[idx]) return;
@@ -464,6 +482,8 @@
 
     const interval = elScaleTempo ? Number(elScaleTempo.value) || 300 : 300;
 
+    setScaleBtnStop(elPlayScaleBtn);
+
     currentScalePlayback = window.AudioEngine.playScale(midiNotes, interval, function (noteIdx) {
       clearScaleHighlights();
       if (noteIdx >= 0 && noteIdx < midiNotes.length) {
@@ -472,6 +492,7 @@
       }
       if (noteIdx === -1) {
         currentScalePlayback = null;
+        resetScaleBtn();
       }
     });
   }
@@ -580,11 +601,12 @@
 
   // ── Modal de diagrama expandido ────────────────────────────
 
-  var zoomState = { cards: [], index: 0, chordName: '' };
+  var zoomState = { cards: [], index: 0, chordName: '', chord: null, scales: [], chordPCs: null, source: 'chords' };
 
   function renderZoomDiagram() {
     var body = document.getElementById('diagram-zoom-body');
     var counter = document.getElementById('diagram-zoom-counter');
+    var title = document.getElementById('diagram-zoom-title');
     if (!body || zoomState.cards.length === 0) return;
 
     var card = zoomState.cards[zoomState.index];
@@ -599,50 +621,85 @@
     var zoomScale = document.getElementById('diagram-zoom-scale');
     var zoomTargets = document.getElementById('diagram-zoom-targets');
     var scaleIdx = zoomScale ? zoomScale.value : '';
-    if (scaleIdx && currentScales[scaleIdx]) {
-      var scale = currentScales[scaleIdx];
+    if (scaleIdx && zoomState.scales[scaleIdx]) {
+      var scale = zoomState.scales[scaleIdx];
       var useTargets = zoomTargets ? zoomTargets.checked : showTargets;
-      var targetOpts = useTargets ? computeTargetOpts(currentChord, scale) : null;
-      addScaleOverlay(svg, voicing, scale.scalePCs, currentChordPCs, targetOpts);
+      var targetOpts = useTargets ? computeTargetOpts(zoomState.chord, scale) : null;
+      addScaleOverlay(svg, voicing, scale.scalePCs, zoomState.chordPCs, targetOpts);
     }
 
     body.innerHTML = '';
     body.appendChild(svg);
     if (counter) counter.textContent = (zoomState.index + 1) + ' / ' + zoomState.cards.length;
+    if (title) title.textContent = zoomState.chordName;
   }
 
   function openDiagramZoom(voicing, chordName) {
+    var allCards = Array.from(elGrid.querySelectorAll('.voicing-card'));
+    var index = allCards.findIndex(function (c) { return c._voicing === voicing; });
+    if (index < 0) index = 0;
+
+    openZoomGeneric(allCards, index, chordName, currentChord, currentScales, 'chords');
+  }
+
+  function populateZoomScaleSelect() {
+    var zoomScale = document.getElementById('diagram-zoom-scale');
+    if (!zoomScale) return;
+    zoomScale.innerHTML = '<option value="">Sin escala</option>';
+    zoomState.scales.forEach(function (scale, idx) {
+      var opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = scale.label;
+      zoomScale.appendChild(opt);
+    });
+    // Si viene de chords view, sincronizar selección con el select principal
+    if (zoomState.source === 'chords' && elScaleSelect) {
+      zoomScale.value = elScaleSelect.value;
+    }
+  }
+
+  function openZoomGeneric(cards, index, chordName, chord, scales, source) {
     var modal = document.getElementById('diagram-zoom-modal');
-    var title = document.getElementById('diagram-zoom-title');
     if (!modal) return;
 
-    // Recoger todas las cards visibles y encontrar el índice de la clickeada
-    var allCards = Array.from(elGrid.querySelectorAll('.voicing-card'));
-    zoomState.cards = allCards;
+    zoomState.cards = cards;
+    zoomState.index = index;
     zoomState.chordName = chordName;
-    zoomState.index = allCards.findIndex(function (c) { return c._voicing === voicing; });
-    if (zoomState.index < 0) zoomState.index = 0;
+    zoomState.chord = chord;
+    zoomState.scales = scales || [];
+    zoomState.chordPCs = chord ? chord.pitchClasses : null;
+    zoomState.source = source || 'external';
 
-    if (title) title.textContent = chordName;
-
-    // Sincronizar scale select del modal con el principal
-    syncZoomScaleSelect();
-
+    populateZoomScaleSelect();
     renderZoomDiagram();
     modal.style.display = 'flex';
   }
 
-  function syncZoomScaleSelect() {
-    var zoomScale = document.getElementById('diagram-zoom-scale');
-    if (!zoomScale) return;
-    // Copiar opciones del select principal
-    zoomScale.innerHTML = elScaleSelect.innerHTML;
-    zoomScale.value = elScaleSelect.value;
+  function updateZoomChordIfChanged() {
+    var card = zoomState.cards[zoomState.index];
+    if (!card || !card._chordName) return;
+    if (card._chordName === zoomState.chordName) return;
+    // Acorde cambió — re-parsear y re-computar escalas
+    zoomState.chordName = card._chordName;
+    var chord = parseChord(card._chordName);
+    zoomState.chord = chord;
+    zoomState.chordPCs = chord ? chord.pitchClasses : null;
+    zoomState.scales = chord
+      ? window.ScaleDetector.scoredCompatibleScales(chord.pitchClasses, chord.rootPc, chord.intervals)
+      : [];
+    populateZoomScaleSelect();
   }
 
   function closeDiagramZoom() {
     var modal = document.getElementById('diagram-zoom-modal');
     if (modal) modal.style.display = 'none';
+    // Detener escala si estaba reproduciéndose
+    if (currentScalePlayback) {
+      currentScalePlayback.stop();
+      currentScalePlayback = null;
+    }
+    clearScaleHighlights();
+    resetScaleBtn();
   }
 
   // Inicializar eventos del modal
@@ -663,25 +720,24 @@
     if (prevBtn) prevBtn.addEventListener('click', function () {
       if (zoomState.index > 0) {
         zoomState.index--;
-        // Actualizar nombre si cambió de grupo
-        var card = zoomState.cards[zoomState.index];
-        if (card && card._chordName) zoomState.chordName = card._chordName;
+        updateZoomChordIfChanged();
         renderZoomDiagram();
       }
     });
     if (nextBtn) nextBtn.addEventListener('click', function () {
       if (zoomState.index < zoomState.cards.length - 1) {
         zoomState.index++;
-        var card = zoomState.cards[zoomState.index];
-        if (card && card._chordName) zoomState.chordName = card._chordName;
+        updateZoomChordIfChanged();
         renderZoomDiagram();
       }
     });
 
-    // Cambiar escala en el modal → re-renderizar + sincronizar con principal
+    // Cambiar escala en el modal → re-renderizar + sincronizar con principal si aplica
     if (zoomScale) zoomScale.addEventListener('change', function () {
-      elScaleSelect.value = zoomScale.value;
-      applyScaleOverlay(); // actualizar vista principal
+      if (zoomState.source === 'chords') {
+        elScaleSelect.value = zoomScale.value;
+        applyScaleOverlay();
+      }
       renderZoomDiagram();
     });
 
@@ -703,9 +759,15 @@
       window.AudioEngine.playChord(midiNotes);
     });
 
-    // Play escala sobre el diagrama expandido
+    // Play/stop escala sobre el diagrama expandido
     var zoomPlayScale = document.getElementById('diagram-zoom-play-scale');
     if (zoomPlayScale) zoomPlayScale.addEventListener('click', function () {
+      // Toggle: si ya está reproduciendo, detener
+      if (currentScalePlayback) {
+        stopCurrentScale();
+        return;
+      }
+
       if (!window.AudioEngine) return;
       var zBody = document.getElementById('diagram-zoom-body');
       if (!zBody) return;
@@ -718,9 +780,7 @@
       var zTempo = document.getElementById('diagram-zoom-tempo');
       var interval = zTempo ? Number(zTempo.value) || 300 : 300;
 
-      // Detener reproducción anterior
-      if (currentScalePlayback) { currentScalePlayback.stop(); currentScalePlayback = null; }
-      clearScaleHighlights();
+      setScaleBtnStop(zoomPlayScale);
 
       currentScalePlayback = window.AudioEngine.playScale(result.midiNotes, interval, function (noteIdx) {
         clearScaleHighlights();
@@ -728,7 +788,10 @@
           var elems = result.midiMap[result.midiNotes[noteIdx]];
           if (elems) elems.forEach(function (el) { highlightNote(el); });
         }
-        if (noteIdx === -1) currentScalePlayback = null;
+        if (noteIdx === -1) {
+          currentScalePlayback = null;
+          resetScaleBtn();
+        }
       });
     });
   });
@@ -1007,6 +1070,6 @@
   }
 
   // Exponer API global
-  window.UI = { showSection };
+  window.UI = { showSection, openZoomGeneric };
   window.SongListView = SongListView;
 })();

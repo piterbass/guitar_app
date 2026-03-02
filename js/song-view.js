@@ -4,6 +4,7 @@
 
 (function () {
   const { createDiagram } = window.FretboardSVG;
+  const { parseChord } = window.ChordParser;
   const SB = window.Songbook;
 
   let currentSongId = null;
@@ -53,9 +54,28 @@
       const card = document.createElement('div');
       card.className = 'voicing-card pinned-bar-card';
       card.dataset.chord = pv.chord;
+      card._voicing = voicing;
+      card._chordName = pv.chord;
       card.appendChild(createDiagram(voicing, pv.chord));
+      card.addEventListener('click', function () {
+        openPinnedZoom(card);
+      });
       bar.appendChild(card);
     });
+  }
+
+  function openPinnedZoom(clickedCard) {
+    const bar = document.getElementById('view-pinned-bar');
+    const allCards = Array.from(bar.querySelectorAll('.pinned-bar-card'));
+    const index = allCards.indexOf(clickedCard);
+    const chordName = clickedCard._chordName;
+
+    const chord = parseChord(chordName);
+    const scales = chord
+      ? window.ScaleDetector.scoredCompatibleScales(chord.pitchClasses, chord.rootPc, chord.intervals)
+      : [];
+
+    window.UI.openZoomGeneric(allCards, index >= 0 ? index : 0, chordName, chord, scales, 'songs');
   }
 
   function highlightPinned(chordName) {
