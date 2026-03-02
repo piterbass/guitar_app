@@ -601,7 +601,7 @@
 
   // ── Modal de diagrama expandido ────────────────────────────
 
-  var zoomState = { cards: [], index: 0, chordName: '', chord: null, scales: [], chordPCs: null, source: 'chords' };
+  var zoomState = { cards: [], index: 0, chordName: '', chord: null, scales: [], chordPCs: null, source: 'chords', fixedScales: {}, songId: null };
 
   function renderZoomDiagram() {
     var body = document.getElementById('diagram-zoom-body');
@@ -672,13 +672,34 @@
       opt.textContent = scale.label;
       zoomScale.appendChild(opt);
     });
+
     // Si viene de chords view, sincronizar selección con el select principal
     if (zoomState.source === 'chords' && elScaleSelect) {
       zoomScale.value = elScaleSelect.value;
+      return;
     }
+
+    // Auto-selección para songs view
+    var autoCheck = document.getElementById('diagram-zoom-auto-scale');
+    if (!autoCheck || !autoCheck.checked) return;
+    if (zoomState.scales.length === 0) return;
+
+    // 1) Buscar escala fijada por label
+    var fixedLabel = zoomState.fixedScales[zoomState.chordName];
+    if (fixedLabel) {
+      for (var i = 0; i < zoomState.scales.length; i++) {
+        if (zoomState.scales[i].label === fixedLabel) {
+          zoomScale.value = String(i);
+          return;
+        }
+      }
+    }
+
+    // 2) Si no hay fijada, seleccionar la primera sugerida
+    zoomScale.value = '0';
   }
 
-  function openZoomGeneric(cards, index, chordName, chord, scales, source) {
+  function openZoomGeneric(cards, index, chordName, chord, scales, source, fixedScales, songId) {
     var modal = document.getElementById('diagram-zoom-modal');
     if (!modal) return;
 
@@ -689,6 +710,16 @@
     zoomState.scales = scales || [];
     zoomState.chordPCs = chord ? chord.pitchClasses : null;
     zoomState.source = source || 'external';
+    zoomState.fixedScales = fixedScales || {};
+    zoomState.songId = songId || null;
+
+    // Mostrar/ocultar botón fijar según contexto
+    var fixBtn = document.getElementById('diagram-zoom-fix-scale');
+    if (fixBtn) fixBtn.style.display = (source === 'songs') ? '' : 'none';
+
+    // Checkbox auto-scale: activar por defecto en songs
+    var autoCheck = document.getElementById('diagram-zoom-auto-scale');
+    if (autoCheck) autoCheck.checked = (source === 'songs');
 
     populateZoomScaleSelect();
     renderZoomDiagram();
@@ -764,6 +795,46 @@
     // Toggle targets en modal
     if (zoomTargets) zoomTargets.addEventListener('change', function () {
       renderZoomDiagram();
+    });
+
+    // Checkbox auto-scale: al cambiar, re-aplicar si se activa
+    var autoScaleCheck = document.getElementById('diagram-zoom-auto-scale');
+    if (autoScaleCheck) autoScaleCheck.addEventListener('change', function () {
+      if (this.checked) {
+        populateZoomScaleSelect(); // re-trigger auto-selection
+        renderZoomDiagram();
+      }
+    });
+
+    // Botón fijar escala para este acorde en la canción
+    var fixScaleBtn = document.getElementById('diagram-zoom-fix-scale');
+    if (fixScaleBtn) fixScaleBtn.addEventListener('click', function () {
+      if (zoomState.source !== 'songs' || !zoomState.songId) return;
+      var zs = document.getElementById('diagram-zoom-scale');
+      var scaleIdx = zs ? zs.value : '';
+      var scaleLabel = (scaleIdx && zoomState.scales[scaleIdx]) ? zoomState.scales[scaleIdx].label : null;
+
+      // Guardar en estado local
+      if (scaleLabel) {
+        zoomState.fixedScales[zoomState.chordName] = scaleLabel;
+      } else {
+        delete zoomState.fixedScales[zoomState.chordName];
+      }
+
+      // Persistir en la canción
+      var song = window.Songbook.getSong(zoomState.songId);
+      if (song && song.pinnedVoicings) {
+        song.pinnedVoicings.forEach(function (pv) {
+          if (pv.chord === zoomState.chordName) {
+            pv.fixedScale = scaleLabel;
+          }
+        });
+        window.Songbook.saveSong(song);
+      }
+
+      // Feedback visual
+      fixScaleBtn.style.background = '#4ecdc4';
+      setTimeout(function () { fixScaleBtn.style.background = ''; }, 400);
     });
 
     // Play acorde

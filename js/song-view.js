@@ -8,6 +8,7 @@
   const SB = window.Songbook;
 
   let currentSongId = null;
+  let currentSong = null;
   let fontSize = 16;
 
   function open(songId) {
@@ -15,6 +16,7 @@
     if (!song) return;
 
     currentSongId = songId;
+    currentSong = song;
     fontSize = 16;
 
     document.getElementById('view-title').textContent = song.title;
@@ -75,7 +77,15 @@
       ? window.ScaleDetector.scoredCompatibleScales(chord.pitchClasses, chord.rootPc, chord.intervals)
       : [];
 
-    window.UI.openZoomGeneric(allCards, index >= 0 ? index : 0, chordName, chord, scales, 'songs');
+    // Construir mapa de escalas fijadas desde los pinnedVoicings de la canción
+    const fixedScales = {};
+    if (currentSong && currentSong.pinnedVoicings) {
+      currentSong.pinnedVoicings.forEach(function (pv) {
+        if (pv.fixedScale) fixedScales[pv.chord] = pv.fixedScale;
+      });
+    }
+
+    window.UI.openZoomGeneric(allCards, index >= 0 ? index : 0, chordName, chord, scales, 'songs', fixedScales, currentSongId);
   }
 
   function highlightPinned(chordName) {
