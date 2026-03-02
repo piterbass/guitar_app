@@ -607,6 +607,7 @@
     var body = document.getElementById('diagram-zoom-body');
     var counter = document.getElementById('diagram-zoom-counter');
     var title = document.getElementById('diagram-zoom-title');
+    var notesDiv = document.getElementById('diagram-zoom-notes');
     if (!body || zoomState.cards.length === 0) return;
 
     var card = zoomState.cards[zoomState.index];
@@ -621,11 +622,30 @@
     var zoomScale = document.getElementById('diagram-zoom-scale');
     var zoomTargets = document.getElementById('diagram-zoom-targets');
     var scaleIdx = zoomScale ? zoomScale.value : '';
+    var targetOpts = null;
     if (scaleIdx && zoomState.scales[scaleIdx]) {
       var scale = zoomState.scales[scaleIdx];
       var useTargets = zoomTargets ? zoomTargets.checked : showTargets;
-      var targetOpts = useTargets ? computeTargetOpts(zoomState.chord, scale) : null;
+      targetOpts = useTargets ? computeTargetOpts(zoomState.chord, scale) : null;
       addScaleOverlay(svg, voicing, scale.scalePCs, zoomState.chordPCs, targetOpts);
+
+      // Indicador de notas con colores
+      if (notesDiv) {
+        var chordPCSet = new Set(zoomState.chordPCs || []);
+        var noteNames = scale.scalePCs.map(function (pc) {
+          var name = window.MusicTheory.pcToName(pc);
+          var cls = 'note';
+          if (targetOpts && targetOpts.targetPCs.has(pc)) cls += ' target-note';
+          else if (targetOpts && targetOpts.modalPCs && targetOpts.modalPCs.has(pc)) cls += ' modal-char-note';
+          else if (chordPCSet.has(pc)) cls += ' chord-tone';
+          else if (targetOpts && targetOpts.tensionPCs.has(pc)) cls += ' tension-note';
+          else if (targetOpts && targetOpts.avoidPCs.has(pc)) cls += ' avoid-note';
+          return '<span class="' + cls + '">' + name + '</span>';
+        });
+        notesDiv.innerHTML = 'Notas: ' + noteNames.join(' ');
+      }
+    } else {
+      if (notesDiv) notesDiv.innerHTML = '';
     }
 
     body.innerHTML = '';
