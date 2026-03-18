@@ -169,15 +169,29 @@
           }
         }
 
+        // ¿El acorde tiene 7ª? → preferir nombres compuestos (9,11,13 en vez de 2,4,6)
+        const has7th = formula.some(iv => iv === 'b7' || iv === '7' || iv === 'bb7');
+
+        // Elige el mejor nombre de intervalo para un semitono dado
+        function pickIntervalName(semi, isExtra) {
+          const candidates = SEMI_TO_INTERVALS[semi];
+          if (!candidates) return null;
+          // Si está en la fórmula, usar ese nombre
+          const inFormula = candidates.find(iv => formula.includes(iv));
+          if (inFormula) return inFormula;
+          // Para extensiones: preferir compuestos (9,11,13) si hay 7ª
+          if (isExtra || has7th) {
+            const compound = candidates.find(iv => /^[#b]?(9|11|13)$/.test(iv));
+            if (compound) return compound;
+          }
+          return candidates[0];
+        }
+
         // Construir intervalos encontrados
         const intervalsFound = [];
         for (const semi of [...relativeSemitones].sort((a, b) => a - b)) {
-          const candidates = SEMI_TO_INTERVALS[semi];
-          if (candidates) {
-            // Preferir el intervalo que está en la fórmula
-            const inFormula = candidates.find(iv => formula.includes(iv));
-            intervalsFound.push(inFormula || candidates[0]);
-          }
+          const name = pickIntervalName(semi, false);
+          if (name) intervalsFound.push(name);
         }
 
         // Construir nombre
@@ -188,8 +202,8 @@
         // Extra extensions en paréntesis
         const extraIntervalNames = [];
         for (const semi of extraSemitones) {
-          const candidates = SEMI_TO_INTERVALS[semi];
-          if (candidates) extraIntervalNames.push(candidates[0]);
+          const name = pickIntervalName(semi, true);
+          if (name) extraIntervalNames.push(name);
         }
         if (extraIntervalNames.length > 0) {
           chordName += '(' + extraIntervalNames.join(',') + ')';
