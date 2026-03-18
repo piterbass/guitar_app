@@ -128,7 +128,7 @@
     }
 
     .nav-btn {
-      padding: 10px 28px;
+      padding: 10px 18px;
       background: transparent;
       color: #a0a0b0;
       border: none;
@@ -1599,6 +1599,110 @@
         size: A4;
       }
     }
+
+    /* ── Chord Analyzer ──────────────────────── */
+    .analyzer-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .analyzer-controls .btn-small {
+      min-width: 32px;
+    }
+    .analyzer-fret-label {
+      color: #aaa;
+      font-size: 13px;
+      min-width: 90px;
+      text-align: center;
+    }
+    #analyzer-fretboard {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+    .analyzer-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+    }
+    .analyzer-primary {
+      border-left: 4px solid #e94560;
+    }
+    .analyzer-chord-name {
+      font-size: 28px;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .analyzer-quality {
+      color: #e94560;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .analyzer-detail {
+      color: #ccc;
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+    .analyzer-detail .label {
+      color: #888;
+    }
+    .analyzer-labels {
+      color: #888;
+      font-size: 11px;
+      font-style: italic;
+    }
+    .analyzer-hint {
+      color: #666;
+      font-size: 14px;
+      text-align: center;
+      padding: 20px 0;
+    }
+    .analyzer-empty {
+      border-left: 4px solid #333;
+    }
+    .analyzer-alts-title {
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .analyzer-alts-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .analyzer-alt {
+      padding: 8px 14px;
+      min-width: 80px;
+      text-align: center;
+      cursor: default;
+    }
+    .analyzer-alt-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .analyzer-alt-quality {
+      font-size: 10px;
+      color: #888;
+    }
+    .btn-play-analyzer {
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .btn-play-analyzer:hover {
+      background: #d63a54;
+    }
   </style>
 </head>
 
@@ -1624,6 +1728,7 @@
       <button class="nav-btn active" id="nav-chords">Acordes</button>
       <button class="nav-btn" id="nav-scales">Escalas</button>
       <button class="nav-btn" id="nav-songs">Canciones</button>
+      <button class="nav-btn" id="nav-analyzer">Analizador</button>
     </nav>
   </header>
 
@@ -1931,6 +2036,26 @@
     </div>
   </section>
 
+  <!-- ════ Seccion: Analizador de Acordes ════ -->
+  <section class="app-section" id="section-analyzer">
+    <div class="section-inner">
+      <h2 style="color:#fff; text-align:center; margin-bottom:4px;">Analizador de Acordes</h2>
+      <p style="color:#888; text-align:center; font-size:13px; margin-bottom:16px;">Tocá cuerdas y trastes para identificar el acorde</p>
+
+      <div class="analyzer-controls">
+        <button id="analyzer-fret-down" class="btn-small" title="Trastes anteriores">&#9664;</button>
+        <span id="analyzer-fret-label" class="analyzer-fret-label"></span>
+        <button id="analyzer-fret-up" class="btn-small" title="Siguientes trastes">&#9654;</button>
+        <button id="analyzer-clear" class="btn-small" style="margin-left:12px;">Limpiar</button>
+        <button id="analyzer-play" class="btn-play-analyzer" title="Reproducir acorde">&#9654; Play</button>
+      </div>
+
+      <div id="analyzer-fretboard"></div>
+      <div id="analyzer-result-primary"></div>
+      <div id="analyzer-result-alternatives"></div>
+    </div>
+  </section>
+
   <!-- ════ Modal: Diagrama expandido ════ -->
   <div class="modal-overlay" id="diagram-zoom-modal">
     <div class="modal-content diagram-zoom-content">
@@ -1992,6 +2117,8 @@
   <script src="js/scale-position-engine.js"></script>
   <script src="js/full-fretboard-svg.js"></script>
   <script src="js/scales-ui.js"></script>
+  <script src="js/chord-identifier.js"></script>
+  <script src="js/chord-analyzer-ui.js"></script>
   <script src="js/ui.js"></script>
 
   <!-- Service Worker para PWA offline -->

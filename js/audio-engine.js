@@ -1,13 +1,30 @@
 // ============================================================
-// audio-engine.js  –  Síntesis de guitarra con Karplus-Strong
+// audio-engine.js  –  Audio con samples de guitarra real
+//                      Fallback a Karplus-Strong si no hay red
 // ============================================================
 
 (function () {
   let ctx = null;
   let activeSources = [];
   let scaleTimeouts = [];
-
   let unlocked = false;
+
+  // ── Sample cache ──
+  const sampleBuffers = {};  // midi number → AudioBuffer
+  let samplesLoading = false;
+  let samplesReady = false;
+
+  // URL base para samples de guitarra nylon (gleitz/midi-js-soundfonts)
+  const SOUNDFONT_BASE = 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_guitar_nylon-mp3/';
+
+  // Nombres de notas MIDI para URLs de soundfont
+  const NOTE_NAMES_FULL = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+  function midiToNoteName(midi) {
+    const octave = Math.floor(midi / 12) - 1;
+    const note = NOTE_NAMES_FULL[midi % 12];
+    return note + octave;
+  }
 
   function getContext() {
     if (!ctx) {
@@ -17,9 +34,6 @@
     return ctx;
   }
 
-  // iOS requiere reproducir audio dentro de un gesto de usuario para
-  // desbloquear el AudioContext. Se reproduce un buffer silencioso UNA vez.
-  // En gestos posteriores solo se llama resume() (ligero, sin crear nodos).
   function onUserGesture() {
     var ac = getContext();
     if (!unlocked) {
@@ -36,50 +50,98 @@
   document.addEventListener('touchend', onUserGesture, true);
   document.addEventListener('click', onUserGesture, true);
 
+  // ── Carga de samples ──
+
   /**
-   * Convierte MIDI note number a frecuencia en Hz.
+   * Carga samples de guitarra para el rango MIDI de guitarra (40-88).
+   * Se hace de forma lazy y no bloqueante.
    */
+  function loadSamples() {
+    if (samplesLoading || samplesReady) return;
+    samplesLoading = true;
+
+    var ac = getContext();
+    // Rango de guitarra: E2 (40) a E6 (88), cargamos cada 1 semitono
+    var midiRange = [];
+    for (var m = 36; m <= 90; m++) midiRange.push(m);
+
+    var loaded = 0;
+    var total = midiRange.length;
+
+    midiRange.forEach(function (midi) {
+      var noteName = midiToNoteName(midi);
+      var url = SOUNDFONT_BASE + noteName + '.mp3';
+
+      fetch(url)
+        .then(function (res) { return res.arrayBuffer(); })
+        .then(function (data) { return ac.decodeAudioData(data); })
+        .then(function (buffer) {
+          sampleBuffers[midi] = buffer;
+          loaded++;
+          if (loaded === total) {
+            samplesReady = true;
+            samplesLoading = false;
+          }
+        })
+        .catch(function () {
+          loaded++;
+          if (loaded === total) {
+            // Algunos fallaron, pero marcamos como ready
+            // si cargó al menos la mitad
+            if (Object.keys(sampleBuffers).length > total / 2) {
+              samplesReady = true;
+            }
+            samplesLoading = false;
+          }
+        });
+    });
+  }
+
+  // Iniciar carga al cargar la página
+  setTimeout(loadSamples, 500);
+
+  // ── Helpers ──
+
   function midiToFreq(midi) {
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
 
   /**
-   * Genera un AudioBuffer con síntesis Karplus-Strong mejorada.
-   * Simula cuerda de guitarra acústica/nylon con excitación suavizada,
-   * filtro de 3 puntos y resonancia de cuerpo.
-   * @param {number} frequency – frecuencia en Hz
-   * @param {number} duration – duración en segundos
-   * @param {number} sampleRate – sample rate del AudioContext
-   * @returns {AudioBuffer}
+   * Busca el sample más cercano a un MIDI dado.
+   * Si no hay sample exacto, busca ±1, ±2, etc.
    */
+  function findClosestSample(midi) {
+    if (sampleBuffers[midi]) return { buffer: sampleBuffers[midi], detune: 0 };
+    for (var d = 1; d <= 4; d++) {
+      if (sampleBuffers[midi - d]) return { buffer: sampleBuffers[midi - d], detune: d * 100 };
+      if (sampleBuffers[midi + d]) return { buffer: sampleBuffers[midi + d], detune: -d * 100 };
+    }
+    return null;
+  }
+
+  // ── Karplus-Strong fallback ──
+
   function createPluckBuffer(frequency, duration, sampleRate) {
     const numSamples = Math.ceil(duration * sampleRate);
     const ac = getContext();
     const buffer = ac.createBuffer(1, numSamples, sampleRate);
     const channel = buffer.getChannelData(0);
 
-    // Delay line = una longitud de onda
     const delaySize = Math.round(sampleRate / frequency);
     if (delaySize < 2) return buffer;
 
-    // ── Excitación: mezcla de ruido suavizado + forma triangular ──
-    // Esto elimina el ataque metálico del ruido blanco puro
     const delayLine = new Float32Array(delaySize);
-    const pickPos = 0.4; // posición del pluck (0.5 = medio, más bajo = más cálido)
+    const pickPos = 0.4;
     const pickSample = Math.round(delaySize * pickPos);
 
     for (let i = 0; i < delaySize; i++) {
-      // Componente triangular (fundamental suave)
       const tri = i < pickSample
         ? i / pickSample
         : (delaySize - i) / (delaySize - pickSample);
-      // Componente de ruido (color tímbrico)
       const noise = Math.random() * 2 - 1;
-      // Mezcla: 60% triangular + 40% ruido → timbre cálido con definición
       delayLine[i] = 0.6 * tri + 0.4 * noise;
     }
 
-    // Suavizar la excitación con 3 pasadas de moving average
     for (let pass = 0; pass < 3; pass++) {
       let prev = delayLine[delaySize - 1];
       for (let i = 0; i < delaySize; i++) {
@@ -90,30 +152,20 @@
       }
     }
 
-    // ── Damping adaptativo por frecuencia ──
-    // Cuerdas graves: más sustain, agudas: decaen más rápido (como guitarra real)
     const freqNorm = Math.max(0, Math.min(1, (frequency - 70) / 900));
-    const damping = 0.9995 - freqNorm * 0.004; // 0.9995 (graves) → 0.9955 (agudas)
+    const damping = 0.9995 - freqNorm * 0.004;
+    const brightness = 0.45 + (1 - freqNorm) * 0.15;
 
-    // Coeficiente de brillo: cuánto pasa del filtro LP (más alto = más brillante)
-    const brightness = 0.45 + (1 - freqNorm) * 0.15; // 0.45–0.60
-
-    // ── Síntesis: filtro LP de 3 puntos ponderado ──
     let idx = 0;
     let prevOut = 0;
     for (let i = 0; i < numSamples; i++) {
       const nextIdx = (idx + 1) % delaySize;
       const prevIdx = (idx - 1 + delaySize) % delaySize;
-
-      // Filtro lowpass de 3 puntos (más suave que promedio de 2)
       const filtered = 0.2 * delayLine[prevIdx] +
                         0.6 * delayLine[idx] +
                         0.2 * delayLine[nextIdx];
-
-      // One-pole lowpass adicional para calidez
       const out = brightness * filtered + (1 - brightness) * prevOut;
       prevOut = out;
-
       channel[i] = out;
       delayLine[idx] = damping * out;
       idx = nextIdx;
@@ -122,31 +174,81 @@
     return buffer;
   }
 
+  // ── Reproducción ──
+
   /**
-   * Reproduce una nota individual.
-   * @param {number} midi – MIDI note number
-   * @param {number} [duration=1.5] – duración en segundos
+   * Reproduce una nota usando sample real si está disponible,
+   * o Karplus-Strong como fallback.
    */
+  function playNote(midi, duration) {
+    if (midi == null) return;
+    duration = duration || 3;
+    var ac = getContext();
+    if (ac.state === 'suspended') ac.resume();
+
+    var sample = samplesReady ? findClosestSample(midi) : null;
+
+    if (sample) {
+      playSampleNote(ac, sample.buffer, sample.detune, ac.currentTime + 0.02, duration, 0.5);
+    } else {
+      var freq = midiToFreq(midi);
+      var audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
+      createSynthChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
+    }
+  }
+
   /**
-   * Crea la cadena de audio: source → bodyFilter → gain → destination.
-   * El filtro simula la resonancia del cuerpo de la guitarra.
+   * Reproduce un sample con detune opcional.
    */
-  function createAudioChain(ac, audioBuffer, startTime, duration, volume) {
+  function playSampleNote(ac, buffer, detune, startTime, duration, volume) {
     try {
-      // Asegurar que startTime no esté en el pasado
+      var now = ac.currentTime;
+      if (startTime < now) startTime = now;
+
+      var source = ac.createBufferSource();
+      source.buffer = buffer;
+      if (detune !== 0) source.detune.value = detune;
+
+      var gain = ac.createGain();
+      gain.gain.setValueAtTime(volume, startTime);
+      // Fade out natural al final
+      var fadeStart = startTime + Math.max(duration - 0.3, duration * 0.8);
+      gain.gain.setValueAtTime(volume, fadeStart);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      source.connect(gain).connect(ac.destination);
+      source.start(startTime);
+      source.stop(startTime + duration);
+
+      activeSources.push(source);
+      source.onended = function () {
+        var i = activeSources.indexOf(source);
+        if (i !== -1) activeSources.splice(i, 1);
+      };
+    } catch (e) {
+      // Fallback a synth
+      var freq = 440 * Math.pow(2, (60 - 69) / 12); // dummy
+      var buf = createPluckBuffer(freq, duration, ac.sampleRate);
+      createSynthChain(ac, buf, startTime, duration, volume);
+    }
+  }
+
+  /**
+   * Cadena de audio para síntesis Karplus-Strong (fallback).
+   */
+  function createSynthChain(ac, audioBuffer, startTime, duration, volume) {
+    try {
       var now = ac.currentTime;
       if (startTime < now) startTime = now;
 
       const source = ac.createBufferSource();
       source.buffer = audioBuffer;
 
-      // Filtro de cuerpo: recorta solo los armónicos más ásperos
       const body = ac.createBiquadFilter();
       body.type = 'lowpass';
       body.frequency.value = 5000;
       body.Q.value = 0.5;
 
-      // Resonancia sutil de caja (no exagerar para no oscurecer)
       const bodyRes = ac.createBiquadFilter();
       bodyRes.type = 'peaking';
       bodyRes.frequency.value = 200;
@@ -186,52 +288,41 @@
     }
   }
 
-  function playNote(midi, duration) {
-    if (midi == null) return;
-    duration = duration || 3;
-    var ac = getContext();
-    if (ac.state === 'suspended') ac.resume();
-    var freq = midiToFreq(midi);
-    var audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
-    createAudioChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
-  }
-
   /**
    * Reproduce un acorde completo con efecto strum.
-   * @param {(number|null)[]} midiNotes – array de 6 MIDI notes (null = muted)
-   * @param {number} [duration=2] – duración total en segundos
    */
   function playChord(midiNotes, duration) {
     if (!midiNotes) return;
     duration = duration || 4;
     const ac = getContext();
     if (ac.state === 'suspended') ac.resume();
-    const strumDelay = 0.030; // 30ms entre cuerdas
+    const strumDelay = 0.030;
 
     const validNotes = midiNotes
       .map((midi, i) => ({ midi, i }))
       .filter(n => n.midi != null);
 
-    var baseTime = ac.currentTime + 0.02; // offset para iOS
+    var baseTime = ac.currentTime + 0.02;
     validNotes.forEach((note, idx) => {
       const startTime = baseTime + idx * strumDelay;
-      const freq = midiToFreq(note.midi);
-      const audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
-      createAudioChain(ac, audioBuffer, startTime, duration, 0.32);
+
+      var sample = samplesReady ? findClosestSample(note.midi) : null;
+      if (sample) {
+        playSampleNote(ac, sample.buffer, sample.detune, startTime, duration, 0.4);
+      } else {
+        const freq = midiToFreq(note.midi);
+        const audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
+        createSynthChain(ac, audioBuffer, startTime, duration, 0.32);
+      }
     });
   }
 
   /**
    * Reproduce una secuencia de notas (escala) con callback por nota.
-   * @param {number[]} midiNotes – array de MIDI notes en orden
-   * @param {number} interval – ms entre notas
-   * @param {function} [onNoteStart] – callback(index) cuando empieza cada nota
-   * @returns {{ stop: function }} – control para detener la reproducción
    */
   function playScale(midiNotes, interval, onNoteStart) {
-    if (!midiNotes || midiNotes.length === 0) return { stop() {} };
+    if (!midiNotes || midiNotes.length === 0) return { stop: function() {} };
 
-    // Detener escala anterior si hay una en curso
     stopScale();
 
     interval = interval || 300;
@@ -245,29 +336,22 @@
       scaleTimeouts.push(tid);
     });
 
-    // Limpiar highlight al terminar
     const endTid = setTimeout(() => {
-      if (onNoteStart) onNoteStart(-1); // señal de fin
+      if (onNoteStart) onNoteStart(-1);
       scaleTimeouts = [];
     }, midiNotes.length * interval);
     scaleTimeouts.push(endTid);
 
     return {
-      stop() { stopScale(); }
+      stop: function() { stopScale(); }
     };
   }
 
-  /**
-   * Detiene la reproducción de escala en curso.
-   */
   function stopScale() {
     scaleTimeouts.forEach(tid => clearTimeout(tid));
     scaleTimeouts = [];
   }
 
-  /**
-   * Detiene toda reproducción en curso.
-   */
   function stopAll() {
     stopScale();
     activeSources.forEach(src => {

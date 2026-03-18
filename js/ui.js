@@ -46,6 +46,8 @@
       document.getElementById('nav-scales').classList.add('active');
     } else if (sectionName === 'songs' || sectionName === 'song-edit' || sectionName === 'song-view') {
       document.getElementById('nav-songs').classList.add('active');
+    } else if (sectionName === 'analyzer') {
+      document.getElementById('nav-analyzer').classList.add('active');
     }
   }
 
@@ -167,6 +169,10 @@
       window.SongListView.render();
       showSection('songs');
     });
+    document.getElementById('nav-analyzer').addEventListener('click', () => showSection('analyzer'));
+
+    // Init Chord Analyzer
+    if (window.ChordAnalyzerUI) window.ChordAnalyzerUI.init();
 
     updateBankCount();
 

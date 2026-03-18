@@ -132,7 +132,7 @@
       name += quality;
     }
     if (extensions && extensions.length > 0) {
-      name += extensions.map(e => '(' + e + ')').join('');
+      name += '(' + extensions.join(',') + ')';
     }
     if (bass) {
       name += '/' + bass;
