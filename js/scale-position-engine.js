@@ -455,29 +455,109 @@
     return [position];
   }
 
+  // ── Extensión de posiciones a octavas superiores ─────────
+
+  /**
+   * Duplica posiciones desplazadas +12 trastes para cubrir el mástil completo.
+   * Filtra posiciones que exceden traste 22 y re-indexa.
+   */
+  function extendPositionsUpNeck(positions, labelPrefix) {
+    if (!positions || positions.length === 0) return positions;
+
+    // No extender posiciones que ya cubren todo el diapasón
+    if (positions.length === 1 && positions[0].fretRange[1] >= 20) return positions;
+
+    const extended = [...positions];
+
+    // Clonar cada posición desplazada +12 trastes
+    for (const pos of positions) {
+      const shiftedNotes = [];
+      for (const n of pos.noteData) {
+        const newFret = n.fret + 12;
+        if (newFret > 22) continue;
+        shiftedNotes.push({
+          ...n,
+          fret: newFret,
+          midi: n.midi + 12,
+        });
+      }
+      // Solo agregar si tiene suficientes notas (al menos 4)
+      if (shiftedNotes.length < 4) continue;
+
+      const allFrets = shiftedNotes.map(n => n.fret);
+      const fretRange = [Math.min(...allFrets), Math.max(...allFrets)];
+
+      // No agregar si se superpone demasiado con una posición existente
+      const overlaps = extended.some(ep =>
+        Math.abs(ep.fretRange[0] - fretRange[0]) <= 1 &&
+        Math.abs(ep.fretRange[1] - fretRange[1]) <= 1
+      );
+      if (overlaps) continue;
+
+      extended.push({
+        index: extended.length,
+        label: pos.label, // se re-etiqueta abajo
+        fretRange,
+        noteData: shiftedNotes,
+      });
+    }
+
+    // Ordenar por traste ascendente
+    extended.sort((a, b) => a.fretRange[0] - b.fretRange[0]);
+
+    // Re-indexar y etiquetar
+    const prefix = labelPrefix || 'Pos';
+    const rootPositionIdx = extended.findIndex(p =>
+      p.noteData.some(n => n.isRoot && n.string === 0)
+    );
+    extended.forEach((p, i) => {
+      p.index = i;
+      p.label = prefix + ' ' + (i + 1);
+    });
+    if (rootPositionIdx >= 0) {
+      extended[rootPositionIdx].label += ' (Raíz)';
+    }
+
+    return extended;
+  }
+
   // ── Dispatcher principal ──────────────────────────────────
 
   /**
    * Genera posiciones para cualquier escala.
    * Despacha al generador adecuado según la familia.
+   * Extiende las posiciones para cubrir octavas superiores del mástil.
    */
   function generatePositions(rootPc, scaleKey) {
     const { positionSystem } = classifyScale(scaleKey);
 
+    let positions;
+    let labelPrefix;
+
     switch (positionSystem) {
       case '3nps':
-        return generate3NPSPositions(rootPc, scaleKey);
+        positions = generate3NPSPositions(rootPc, scaleKey);
+        labelPrefix = 'Pos';
+        break;
       case 'pentatonic':
-        return generatePentatonicPositions(rootPc, scaleKey);
+        positions = generatePentatonicPositions(rootPc, scaleKey);
+        labelPrefix = 'Box';
+        break;
       case 'blues-box':
-        return generateBluesPositions(rootPc, scaleKey);
+        positions = generateBluesPositions(rootPc, scaleKey);
+        labelPrefix = 'Box';
+        break;
       case 'symmetric':
-        return generateSymmetricPositions(rootPc, scaleKey);
+        positions = generateSymmetricPositions(rootPc, scaleKey);
+        labelPrefix = 'Patrón';
+        break;
       case 'full':
         return generateFullPosition(rootPc, scaleKey);
       default:
         return generateFullPosition(rootPc, scaleKey);
     }
+
+    return extendPositionsUpNeck(positions, labelPrefix);
   }
 
   // ── Etiquetas de familia (español) ────────────────────────
