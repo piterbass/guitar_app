@@ -28,7 +28,7 @@
   let elProgSelect, elProgStrip, elProgInfo, elProgScaleEditor, elProgEditorToggle;
   let elBankSelect;
   let elMetronomeToggle;
-  let elPlayBtn, elStopBtn;
+  let elPlayBtn, elPauseBtn, elStopBtn;
   let elFretboard;
   let elBeatIndicator;
   let elLoopToggle;
@@ -75,6 +75,7 @@
     elBpmDisplay       = document.getElementById('practice-bpm-display');
     elMetronomeToggle  = document.getElementById('practice-metronome');
     elPlayBtn          = document.getElementById('practice-play');
+    elPauseBtn         = document.getElementById('practice-pause');
     elStopBtn          = document.getElementById('practice-stop');
     elFretboard        = document.getElementById('practice-fretboard');
     elBeatIndicator    = document.getElementById('practice-beat-indicator');
@@ -118,6 +119,7 @@
       practiceState.loopOn = elLoopToggle.checked;
     });
     elPlayBtn.addEventListener('click', play);
+    elPauseBtn.addEventListener('click', pause);
     elStopBtn.addEventListener('click', stop);
 
     // Initial
@@ -622,12 +624,22 @@
     if (notes.length === 0) return;
 
     practiceState._currentNotes = notes;
-    practiceState._noteIndex = 0;
-    practiceState._beatCount = 0;
+    if (!practiceState.paused) {
+      practiceState._noteIndex = 0;
+      practiceState._beatCount = 0;
+      if (practiceState.progressionMode) {
+        practiceState.progressionCurrentIdx = 0;
+        applyProgChordScale(0);
+        renderProgStrip();
+        practiceState._currentNotes = buildMidiNotes();
+      }
+    }
     practiceState.playing = true;
+    practiceState.paused = false;
 
     elPlayBtn.disabled = true;
     elPlayBtn.style.opacity = '0.5';
+    if (elPauseBtn) { elPauseBtn.disabled = false; elPauseBtn.style.opacity = '1'; }
     elStopBtn.disabled = false;
     elStopBtn.style.opacity = '1';
 
@@ -692,28 +704,48 @@
     }, intervalMs);
   }
 
+  function pause() {
+    if (!practiceState.playing) return;
+    if (practiceState._intervalId) {
+      clearInterval(practiceState._intervalId);
+      practiceState._intervalId = null;
+    }
+    practiceState.playing = false;
+    practiceState.paused = true;
+
+    Audio.stopAll();
+    FB.clearHighlights();
+
+    if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
+    if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }
+    if (elStopBtn) { elStopBtn.disabled = false; elStopBtn.style.opacity = '1'; }
+    if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
+  }
+
   function stop() {
     if (practiceState._intervalId) {
       clearInterval(practiceState._intervalId);
       practiceState._intervalId = null;
     }
     practiceState.playing = false;
+    practiceState.paused = false;
     practiceState._noteIndex = 0;
+    practiceState._beatCount = 0;
+
+    // Reset progression to beginning
+    if (practiceState.progressionMode) {
+      practiceState.progressionCurrentIdx = 0;
+      applyProgChordScale(0);
+      renderProgStrip();
+    }
 
     Audio.stopAll();
     FB.clearHighlights();
 
-    if (elPlayBtn) {
-      elPlayBtn.disabled = false;
-      elPlayBtn.style.opacity = '1';
-    }
-    if (elStopBtn) {
-      elStopBtn.disabled = true;
-      elStopBtn.style.opacity = '0.5';
-    }
-    if (elBeatIndicator) {
-      elBeatIndicator.innerHTML = '';
-    }
+    if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
+    if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }
+    if (elStopBtn) { elStopBtn.disabled = true; elStopBtn.style.opacity = '0.5'; }
+    if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
   }
 
   // ── Beat indicator ──

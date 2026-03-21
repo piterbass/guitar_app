@@ -28,7 +28,7 @@
   let elCurrentName, elNextName, elDiagram;
   let elSpeed, elBpmDisplay, elBpmInput;
   let elMetronome, elLoop;
-  let elPlay, elStop, elBeatIndicator;
+  let elPlay, elPause, elStop, elBeatIndicator;
   let elPositionZone;
 
   // ── State ──
@@ -47,6 +47,7 @@
     metronomeOn: true,
     loopOn: true,
     playing: false,
+    paused: false,
     _intervalId: null,
     _countIdx: 0,
   };
@@ -70,6 +71,7 @@
     elMetronome     = document.getElementById('cp-metronome');
     elLoop          = document.getElementById('cp-loop');
     elPlay          = document.getElementById('cp-play');
+    elPause         = document.getElementById('cp-pause');
     elStop          = document.getElementById('cp-stop');
     elBeatIndicator = document.getElementById('cp-beat-indicator');
     elPositionZone  = document.getElementById('cp-position-zone');
@@ -121,8 +123,9 @@
     elMetronome.addEventListener('change', function () { state.metronomeOn = elMetronome.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
 
-    // Play / Stop
+    // Play / Pause / Stop
     elPlay.addEventListener('click', play);
+    elPause.addEventListener('click', pause);
     elStop.addEventListener('click', stop);
 
     // Load first progression
@@ -339,15 +342,20 @@
     if (state.playing) return;
     if (state.chords.length === 0) return;
 
-    state.currentChordIndex = 0;
+    // If resuming from pause, keep position; otherwise start from beginning
+    if (!state.paused) {
+      state.currentChordIndex = 0;
+    }
     state.beatInChord = 0;
     state._countIdx = 0;
     state.playing = true;
+    state.paused = false;
 
     elPlay.disabled = true;
     elPlay.style.opacity = '0.5';
     elStop.disabled = false;
     elStop.style.opacity = '1';
+    if (elPause) { elPause.disabled = false; elPause.style.opacity = '1'; }
 
     renderCurrentChord();
 
@@ -404,28 +412,42 @@
     }, intervalMs);
   }
 
+  function pause() {
+    if (!state.playing) return;
+    if (state._intervalId) {
+      clearInterval(state._intervalId);
+      state._intervalId = null;
+    }
+    state.playing = false;
+    state.paused = true;
+
+    Audio.stopAll();
+
+    if (elPlay) { elPlay.disabled = false; elPlay.style.opacity = '1'; }
+    if (elPause) { elPause.disabled = true; elPause.style.opacity = '0.5'; }
+    if (elStop) { elStop.disabled = false; elStop.style.opacity = '1'; }
+    if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
+  }
+
   function stop() {
     if (state._intervalId) {
       clearInterval(state._intervalId);
       state._intervalId = null;
     }
     state.playing = false;
+    state.paused = false;
     state._countIdx = 0;
     state.beatInChord = 0;
+    state.currentChordIndex = 0;
 
     Audio.stopAll();
 
-    if (elPlay) {
-      elPlay.disabled = false;
-      elPlay.style.opacity = '1';
-    }
-    if (elStop) {
-      elStop.disabled = true;
-      elStop.style.opacity = '0.5';
-    }
-    if (elBeatIndicator) {
-      elBeatIndicator.innerHTML = '';
-    }
+    if (elPlay) { elPlay.disabled = false; elPlay.style.opacity = '1'; }
+    if (elPause) { elPause.disabled = true; elPause.style.opacity = '0.5'; }
+    if (elStop) { elStop.disabled = true; elStop.style.opacity = '0.5'; }
+    if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
+
+    renderCurrentChord();
   }
 
   // ── Beat indicator (same as practice-mode.js) ──
