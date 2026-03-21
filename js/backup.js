@@ -24,6 +24,7 @@
     if (!elPanel) return;
 
     document.getElementById('nav-backup').addEventListener('click', togglePanel);
+    document.getElementById('backup-close').addEventListener('click', togglePanel);
     elDownload.addEventListener('click', downloadBackup);
     elUpload.addEventListener('click', function () { elFile.click(); });
     elFile.addEventListener('change', onFileSelected);
