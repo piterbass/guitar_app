@@ -443,9 +443,16 @@
         practiceState.progressionScaleMap[g.index] = { rootPc: rootPc, scaleKey: scaleKey };
         // Save to localStorage
         saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
-        // If this is the current chord playing, update live
-        if (practiceState.progressionCurrentIdx === g.index) {
+        // If playing, only update if this is the current chord
+        // If not playing, navigate to this chord and show the new scale
+        if (practiceState.playing) {
+          if (practiceState.progressionCurrentIdx === g.index) {
+            applyProgChordScale(g.index);
+          }
+        } else {
+          practiceState.progressionCurrentIdx = g.index;
           applyProgChordScale(g.index);
+          renderProgStrip();
         }
       });
 
