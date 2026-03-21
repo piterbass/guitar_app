@@ -25,6 +25,7 @@
   let elDirection;
   let elSpeed;
   let elBpmDisplay, elBpmInput;
+  let elProgSelect, elProgStrip, elProgInfo;
   let elBankSelect;
   let elMetronomeToggle;
   let elPlayBtn, elStopBtn;
@@ -50,6 +51,12 @@
     _noteIndex: 0,
     _currentNotes: [],
     _beatCount: 0,
+    // progression mode
+    progressionMode: false,
+    progressionChords: [],
+    progressionCurrentIdx: 0,
+    progressionNotesPlayed: 0,
+    progressionNotesPerChord: 0,
   };
 
   // ── Init ──
@@ -72,6 +79,9 @@
     elLoopToggle       = document.getElementById('practice-loop');
     elBpmInput         = document.getElementById('practice-bpm-input');
     elBankSelect       = document.getElementById('practice-bank-select');
+    elProgSelect       = document.getElementById('practice-prog-select');
+    elProgStrip        = document.getElementById('practice-prog-strip');
+    elProgInfo         = document.getElementById('practice-prog-info');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -79,11 +89,13 @@
     populateRootSelector();
     populateScaleTypeSelector();
     populateBankSelector();
+    populateProgSelector();
 
     // Events
     elRootSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
     elTypeSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
     elBankSelect.addEventListener('change', onBankSelected);
+    if (elProgSelect) elProgSelect.addEventListener('change', onProgSelected);
     elPositionSelect.addEventListener('change', onPositionChanged);
     elDirection.addEventListener('change', () => {
       practiceState.direction = elDirection.value;
@@ -177,6 +189,152 @@
     elRootSelect.value = scale.rootPc;
     elTypeSelect.value = scale.scaleKey;
     onScaleChanged();
+  }
+
+  // ── Progression mode ──
+
+  function populateProgSelector() {
+    if (!elProgSelect) return;
+    elProgSelect.innerHTML = '<option value="">— Sin progresión —</option>';
+
+    // Built-in progressions
+    if (window.ChordProgressions) {
+      var all = window.ChordProgressions.getAll();
+      var optgroup = document.createElement('optgroup');
+      optgroup.label = 'Biblioteca';
+      all.forEach(function (p) {
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name + (p.artist ? ' – ' + p.artist : '');
+        optgroup.appendChild(opt);
+      });
+      elProgSelect.appendChild(optgroup);
+    }
+
+    // User's songbook songs
+    if (window.Songbook) {
+      var songs = window.Songbook.getSongs();
+      var hasSongs = false;
+      var songGroup = document.createElement('optgroup');
+      songGroup.label = 'Mis Canciones';
+      songs.forEach(function (song) {
+        var chords = window.Songbook.extractChords(song.content);
+        if (chords.length === 0) return;
+        hasSongs = true;
+        var opt = document.createElement('option');
+        opt.value = 'song-' + song.id;
+        opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '');
+        opt.dataset.chords = JSON.stringify(chords);
+        songGroup.appendChild(opt);
+      });
+      if (hasSongs) elProgSelect.appendChild(songGroup);
+    }
+  }
+
+  function onProgSelected() {
+    stop();
+    var id = elProgSelect.value;
+    if (!id) {
+      practiceState.progressionMode = false;
+      practiceState.progressionChords = [];
+      if (elProgStrip) elProgStrip.style.display = 'none';
+      if (elProgInfo) elProgInfo.textContent = '';
+      return;
+    }
+
+    var chords = null;
+
+    // Check if songbook song
+    if (id.startsWith('song-')) {
+      var opt = elProgSelect.querySelector('option[value="' + id + '"]');
+      if (opt && opt.dataset.chords) {
+        chords = JSON.parse(opt.dataset.chords);
+        // Deduplicate consecutive same chords
+        var unique = [chords[0]];
+        for (var i = 1; i < chords.length; i++) {
+          if (chords[i] !== chords[i - 1]) unique.push(chords[i]);
+        }
+        chords = unique;
+      }
+    } else if (window.ChordProgressions) {
+      var all = window.ChordProgressions.getAll();
+      var prog = all.find(function (p) { return p.id === id; });
+      if (prog) chords = prog.chords;
+    }
+
+    if (!chords || chords.length === 0) return;
+
+    practiceState.progressionMode = true;
+    practiceState.progressionChords = chords;
+    practiceState.progressionCurrentIdx = 0;
+    practiceState.progressionNotesPlayed = 0;
+
+    // Apply first chord's suggested scale
+    applyProgChordScale(0);
+
+    // Render progression strip
+    renderProgStrip();
+    if (elProgStrip) elProgStrip.style.display = '';
+  }
+
+  function applyProgChordScale(chordIdx) {
+    if (chordIdx >= practiceState.progressionChords.length) return;
+    var chordName = practiceState.progressionChords[chordIdx];
+    var suggestion = window.ChordProgressions.suggestScale(chordName);
+    var { getScalePCs } = window.MusicTheory;
+
+    practiceState.rootPc = suggestion.rootPc;
+    practiceState.scaleKey = suggestion.scaleKey;
+    practiceState.scalePCs = getScalePCs(suggestion.rootPc, suggestion.scaleKey);
+    practiceState.positions = Engine.generatePositions(suggestion.rootPc, suggestion.scaleKey);
+    practiceState.selectedPosition = 0;
+
+    // Update UI selectors
+    if (elRootSelect) elRootSelect.value = suggestion.rootPc;
+    if (elTypeSelect) elTypeSelect.value = suggestion.scaleKey;
+    populatePositionSelector();
+    renderFretboard();
+
+    // Update info
+    var scaleName = window.ScaleDetector.SCALE_LABELS[suggestion.scaleKey] || suggestion.scaleKey;
+    var rootName = window.MusicTheory.pcToName(suggestion.rootPc);
+    if (elProgInfo) {
+      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName;
+    }
+
+    // Calculate how many notes per chord (one pass of the position)
+    var notes = buildMidiNotes();
+    practiceState.progressionNotesPerChord = notes.length;
+  }
+
+  function renderProgStrip() {
+    if (!elProgStrip) return;
+    elProgStrip.innerHTML = '';
+    practiceState.progressionChords.forEach(function (chord, i) {
+      var chip = document.createElement('span');
+      chip.className = 'cp-chord-chip';
+      if (i === practiceState.progressionCurrentIdx) chip.classList.add('current');
+      else if (i === practiceState.progressionCurrentIdx + 1) chip.classList.add('next');
+      chip.textContent = chord;
+      elProgStrip.appendChild(chip);
+    });
+  }
+
+  function advanceProgChord() {
+    practiceState.progressionCurrentIdx++;
+    if (practiceState.progressionCurrentIdx >= practiceState.progressionChords.length) {
+      if (practiceState.loopOn) {
+        practiceState.progressionCurrentIdx = 0;
+      } else {
+        return false; // signal to stop
+      }
+    }
+    applyProgChordScale(practiceState.progressionCurrentIdx);
+    renderProgStrip();
+    // Scroll current into view
+    var current = elProgStrip && elProgStrip.querySelector('.cp-chord-chip.current');
+    if (current) current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    return true;
   }
 
   // ── Scale / Position changes ──
@@ -359,7 +517,18 @@
       practiceState._noteIndex++;
 
       if (practiceState._noteIndex >= practiceState._currentNotes.length) {
-        if (practiceState.loopOn) {
+        // Progression mode: advance to next chord's scale
+        if (practiceState.progressionMode) {
+          var canContinue = advanceProgChord();
+          if (!canContinue) {
+            stop();
+            return;
+          }
+          // Rebuild notes for new scale
+          practiceState._currentNotes = buildMidiNotes();
+          practiceState._noteIndex = 0;
+          practiceState._beatCount++;
+        } else if (practiceState.loopOn) {
           practiceState._noteIndex = 0;
           practiceState._beatCount++;
         } else {

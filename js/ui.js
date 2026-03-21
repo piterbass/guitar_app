@@ -14,7 +14,7 @@
   let elInput, elBtnSearch, elGrid, elInfo, elSortSelect, elPositionFilter, elVoicingCategory;
   let elRoot, elQuality, elBass;
   let elExtensions;
-  let elTabGen, elTabBank, elManualSection, elBankSearch, elBankSearchInput;
+  let elTabGen, elTabBank, elTabPractice, elChordPracticePanel, elManualSection, elBankSearch, elBankSearchInput;
   let elScaleSection, elScaleSelect, elScaleNotes;
   let elScaleModeToggle, elHarmonicFunction, elShowTargets;
   let elPlayScaleBtn, elScaleTempo;
@@ -67,6 +67,8 @@
     elExtensions = document.querySelectorAll('.ext-checkbox');
     elTabGen = document.getElementById('tab-generated');
     elTabBank = document.getElementById('tab-bank');
+    elTabPractice = document.getElementById('tab-practice');
+    elChordPracticePanel = document.getElementById('chord-practice-panel');
     elManualSection = document.getElementById('manual-section');
     elBankSearch = document.getElementById('bank-search');
     elBankSearchInput = document.getElementById('bank-search-input');
@@ -148,6 +150,7 @@
     // Tabs acordes
     elTabGen.addEventListener('click', () => switchTab('generated'));
     elTabBank.addEventListener('click', () => switchTab('bank'));
+    elTabPractice.addEventListener('click', () => switchTab('practice'));
 
     // Bank search
     elBankSearchInput.addEventListener('input', () => renderBankView());
@@ -247,11 +250,28 @@
     currentTab = tab;
     elTabGen.classList.toggle('active', tab === 'generated');
     elTabBank.classList.toggle('active', tab === 'bank');
+    elTabPractice.classList.toggle('active', tab === 'practice');
     elManualSection.style.display = tab === 'bank' ? 'flex' : 'none';
     elBankSearch.style.display = tab === 'bank' ? 'block' : 'none';
+    elChordPracticePanel.style.display = tab === 'practice' ? 'block' : 'none';
     elScaleSection.style.display = tab === 'generated' && currentScales.length > 0 ? 'block' : 'none';
+
+    // Hide sort-row and results-grid when in practice mode
+    var elSortRow = document.querySelector('.sort-row');
+    var elResultsGrid = document.getElementById('results-grid');
+    if (elSortRow) elSortRow.style.display = tab === 'practice' ? 'none' : '';
+    if (elResultsGrid) elResultsGrid.style.display = tab === 'practice' ? 'none' : '';
+
     if (tab === 'generated') doSearch();
-    else renderBankView();
+    else if (tab === 'bank') renderBankView();
+    else if (tab === 'practice') {
+      if (window.ChordPractice) window.ChordPractice.syncFromExplore();
+    }
+
+    // Stop chord practice when leaving
+    if (tab !== 'practice' && window.ChordPractice) {
+      window.ChordPractice.stop();
+    }
   }
 
   // ── Búsqueda (tab Generados) ───────────────────────────────
