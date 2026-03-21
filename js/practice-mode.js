@@ -529,6 +529,37 @@
       opt.textContent = pos.label + ' (' + fretText + ')';
       elPositionSelect.appendChild(opt);
     });
+
+    // Append custom positions for this root + scale
+    if (window.CustomScales) {
+      var custom = window.CustomScales.getByScale(practiceState.rootPc, practiceState.scaleKey);
+      custom.forEach(function (cs) {
+        // Build a position object compatible with the engine format
+        var formula = window.MusicTheory.SCALE_FORMULAS[practiceState.scaleKey];
+        var posObj = {
+          label: '★ ' + cs.positionLabel,
+          fretRange: cs.fretRange,
+          noteData: cs.noteData.map(function (n) {
+            var degree = practiceState.scalePCs.indexOf(n.pc);
+            return {
+              string: n.string, fret: n.fret, midi: n.midi, pc: n.pc,
+              interval: formula && degree >= 0 ? formula[degree] : '',
+              isRoot: n.pc === practiceState.rootPc,
+              isTriad: degree !== -1 && degree % 2 === 0,
+            };
+          }),
+        };
+        var idx = practiceState.positions.length;
+        practiceState.positions.push(posObj);
+
+        var opt = document.createElement('option');
+        opt.value = idx;
+        var fretText = cs.fretRange[0] + '-' + cs.fretRange[1];
+        opt.textContent = '★ ' + cs.positionLabel + ' (' + cs.name + ', trastes ' + fretText + ')';
+        opt.style.color = '#ffe66d';
+        elPositionSelect.appendChild(opt);
+      });
+    }
   }
 
   function onPositionChanged() {

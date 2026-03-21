@@ -9,6 +9,7 @@
     'guitar-scale-bank':        'Mis Escalas',
     'guitar-chord-bank':        'Mis Acordes',
     'practice-prog-scale-maps': 'Mis Prácticas',
+    'guitar-custom-scales':     'Mis Posiciones',
   };
 
   var elPanel, elSummary, elDownload, elUpload, elFile, elStatus;
@@ -73,6 +74,9 @@
       case 'practice-prog-scale-maps':
         var progs = Object.keys(data).length;
         return progs + (progs === 1 ? ' progresión configurada' : ' progresiones configuradas');
+      case 'guitar-custom-scales':
+        var pos = Array.isArray(data) ? data.length : 0;
+        return pos + (pos === 1 ? ' posición personalizada' : ' posiciones personalizadas');
       default:
         return 'datos guardados';
     }
@@ -194,9 +198,20 @@
       case 'practice-prog-scale-maps':
         existing = existing || {};
         incoming = incoming || {};
-        // Merge: incoming overwrites existing per progression (user's latest config wins)
         Object.keys(incoming).forEach(function (progId) {
           existing[progId] = incoming[progId];
+        });
+        localStorage.setItem(key, JSON.stringify(existing));
+        break;
+
+      case 'guitar-custom-scales':
+        existing = existing || [];
+        incoming = incoming || [];
+        var existingCustomIds = new Set(existing.map(function (s) { return s.id; }));
+        incoming.forEach(function (item) {
+          if (!existingCustomIds.has(item.id)) {
+            existing.push(item);
+          }
         });
         localStorage.setItem(key, JSON.stringify(existing));
         break;

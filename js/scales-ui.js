@@ -16,7 +16,7 @@
   let elShowFull, elShowIntervals, elDirection;
   let elPlayPosition, elPlayFull, elTempo;
   let elFlipStrings;
-  let elTabExplore, elTabBank, elTabPractice, elExplorePanel, elBankPanel, elPracticePanel, elBankCount;
+  let elTabExplore, elTabBank, elTabPractice, elTabBuilder, elExplorePanel, elBankPanel, elPracticePanel, elBuilderPanel, elBankCount;
   let elBankList, elBankExport, elBankImport, elBankFile;
 
   // ── Estado ────────────────────────────────────────────────
@@ -92,9 +92,11 @@
     elTabExplore = document.getElementById('scales-tab-explore');
     elTabPractice = document.getElementById('scales-tab-practice');
     elTabBank = document.getElementById('scales-tab-bank');
+    elTabBuilder = document.getElementById('scales-tab-builder');
     elExplorePanel = document.getElementById('scales-explore-panel');
     elPracticePanel = document.getElementById('scales-practice-panel');
     elBankPanel = document.getElementById('scales-bank-panel');
+    elBuilderPanel = document.getElementById('scales-builder-panel');
     elBankCount = document.getElementById('scales-bank-count');
     elBankList = document.getElementById('scales-bank-list');
     elFlipStrings = document.getElementById('scales-flip-strings');
@@ -145,6 +147,7 @@
     elTabExplore.addEventListener('click', () => switchTab('explore'));
     elTabPractice.addEventListener('click', () => switchTab('practice'));
     elTabBank.addEventListener('click', () => switchTab('bank'));
+    elTabBuilder.addEventListener('click', () => switchTab('builder'));
 
     // Events - save
     elSaveBtn.addEventListener('click', saveCurrentScale);
@@ -417,12 +420,17 @@
     elTabExplore.classList.toggle('active', tab === 'explore');
     elTabPractice.classList.toggle('active', tab === 'practice');
     elTabBank.classList.toggle('active', tab === 'bank');
+    elTabBuilder.classList.toggle('active', tab === 'builder');
     elExplorePanel.style.display = tab === 'explore' ? '' : 'none';
     elPracticePanel.style.display = tab === 'practice' ? '' : 'none';
     elBankPanel.style.display = tab === 'bank' ? '' : 'none';
+    elBuilderPanel.style.display = tab === 'builder' ? '' : 'none';
 
     if (tab === 'bank') {
       renderBankView();
+    }
+    if (tab === 'builder' && window.CustomScaleBuilder) {
+      window.CustomScaleBuilder.refresh();
     }
     if (tab === 'practice') {
       // Stop practice playback when leaving, sync when entering
