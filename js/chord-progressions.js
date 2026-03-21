@@ -173,27 +173,76 @@
     },
     {
       id: 'cabildo-y-juramento', name: 'Cabildo y Juramento', artist: 'Conociendo Rusia',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 120,
-      chords: ['D','F#m','Bm','A','G','D','A','D',
-               'D','F#m','Bm','A','G','D','A','D'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 105,
+      chords: [
+        // Estrofa
+        'Gm9','Cm9','Fsus4','F','Bb','D7#9','D7b9',
+        'Gm9','Cm9','Fsus4','F','Bb','D7#9','D7b9',
+        // Estribillo
+        'Cm9','Fsus4','F','Bbmaj7','Ebmaj7','Am7b5','D7#9','D7b9','Gm',
+        // Estribillo 2
+        'G7','Cm9','Fsus4','F','Bbmaj7','Ebmaj7','Am7b5','D7#9','D7b9','Gm',
+      ],
     },
     {
       id: 'tres-agujas', name: 'Tres agujas', artist: 'Fito Páez',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 90,
-      chords: ['Am','G','F','E7','Am','G','F','E7',
-               'Dm','Am','E7','Am','Dm','Am','E7','Am'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 85,
+      chords: [
+        // Estrofa (Gm)
+        'Gm7','Cm7','Eb/F','Bbmaj7','Ebmaj7','Gm/E','Gm/F','Gm/E','Am7b5','D7b5','Gm7',
+        // Estribillo (Gm)
+        'Gm','Gmmaj7','Gm7','Gm6','Ebmaj7','F7','D9',
+        'C9','F13','Ebmaj7',
+        'Gm','Gmmaj7','Gm7','Gm6','Ebmaj7','F7','D9',
+        'C9','F13','Ebmaj7',
+        // Puente
+        'Cm7','Cdim7','Bbm7','Bbdim7','Am7','Ebdim7','Dm7','Fmaj7/G','E7b9',
+        // Estrofa (Am - modulación)
+        'Am7','Dm7','Fmaj7/G','Cmaj7','Fmaj7','F#m7b5','Am7/G','F#m7b5','Bm7b5','E7b9','Am7',
+        // Estribillo (Am)
+        'Am','Ammaj7','Am7','Am6','Fmaj7','Am7',
+        'D9','G13','Fmaj7',
+        'Am','Ammaj7','Am7','Am6','Fmaj7','Am7',
+        'D9','G13','Fmaj7',
+        // Puente 2
+        'Dm7','Ddim7','Cm7','Cdim7','Bm7','Bdim7','Em7','G/A','Gm/F#',
+        // Final (Bm - modulación)
+        'Bm7','Em7','G/A','Gmaj#11/A','Dmaj7',
+        'Gmaj7','G#m7b5','G5/A','G#m7b5','C#m7b5','F#+7','Bm7','B11',
+      ],
     },
     {
       id: 'promesas-sobre-el-bidet', name: 'Promesas sobre el bidet', artist: 'Charly García',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 130,
-      chords: ['E','B','C#m','A','E','B','A','A',
-               'E','B','C#m','A','E','B','A','E'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 120,
+      chords: [
+        // Estrofa
+        'Gm7','Am7','Dm7',
+        'Gm7','Am7','Dm7',
+        'Gm7','Am7','Dm7',
+        'Bbmaj7','Csus4',
+        // Estribillo
+        'F','Ebmaj7/F','Dm7','Bbmaj7',
+        'F','Fm','Dm7','Ebmaj7',
+        'Dm7','A/C#','Am/C','Bm7b5',
+        'Bbmaj7','Am7','Csus4','Dm7','Gm7','Am7',
+      ],
     },
     {
       id: 'seminare', name: 'Seminare', artist: 'Serú Girán',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 125,
-      chords: ['A','D','E','A','A','D','E','A',
-               'F#m','D','E','A','F#m','D','E','A'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 100,
+      chords: [
+        // Estrofa
+        'G','D/F#','Em','B','Cadd9','C','Dsus4','D7sus4',
+        'G','D/F#','Em','B','Cadd9','C','Dsus4','D7sus4',
+        // Estribillo
+        'Am','G6/B','Cadd9','D/C','Em','Em7','C#m7b5','Cm',
+        'G/B','G/C','G/D','G7','C','B7','Em7','A9',
+        'Bm/D','Am/D','G/D','G',
+        // Solo
+        'G','A/G','Gmaj7','C/G','G','D/G','C/G',
+        'G','D/G','C/G',
+        'G','A/G','Gmaj7','C/G','G','D/G','C/G','G',
+      ],
     },
   ];
 
