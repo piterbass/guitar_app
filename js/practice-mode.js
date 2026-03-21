@@ -340,9 +340,15 @@
     if (elTypeSelect) elTypeSelect.value = mapping.scaleKey;
     populatePositionSelector();
 
-    // Apply per-chord position if set, otherwise keep current
-    if (mapping.positionIdx !== undefined && mapping.positionIdx !== null && mapping.positionIdx >= 0) {
-      practiceState.selectedPosition = Math.min(mapping.positionIdx, practiceState.positions.length - 1);
+    // Check for position override at the current global position
+    var globalPos = practiceState.selectedPosition;
+    var overrides = mapping.positionOverrides || {};
+    if (overrides[globalPos] !== undefined) {
+      // Override: use custom position instead of the generated one
+      var overrideIdx = overrides[globalPos];
+      if (overrideIdx < practiceState.positions.length) {
+        practiceState.selectedPosition = overrideIdx;
+      }
     } else if (practiceState.selectedPosition >= practiceState.positions.length) {
       practiceState.selectedPosition = 0;
     }
@@ -353,11 +359,13 @@
     // Update info
     var scaleName = window.ScaleDetector.SCALE_LABELS[mapping.scaleKey] || mapping.scaleKey;
     var rootName = window.MusicTheory.pcToName(mapping.rootPc);
-    var posLabel = practiceState.positions[practiceState.selectedPosition]
-      ? practiceState.positions[practiceState.selectedPosition].label : '';
+    var posInfo = '';
+    if (overrides[globalPos] !== undefined) {
+      var pos = practiceState.positions[practiceState.selectedPosition];
+      posInfo = pos ? ' [' + pos.label + ']' : '';
+    }
     if (elProgInfo) {
-      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName +
-        (mapping.positionIdx >= 0 ? ' [' + posLabel + ']' : '');
+      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName + posInfo;
     }
 
     // Calculate how many notes per chord
@@ -476,77 +484,134 @@
 
       row.appendChild(sel);
 
-      // Position selector per chord
-      var posSel = document.createElement('select');
-      posSel.className = 'prog-scale-select prog-pos-select';
-      posSel.title = 'Posición (opcional)';
+      // Override button: assign custom position for a specific global position
       var mapRootPc = currentMapping ? currentMapping.rootPc : (parsed ? parsed.rootPc : 0);
       var mapScaleKey = currentMapping ? currentMapping.scaleKey : 'major';
-      var mapPosIdx = currentMapping ? currentMapping.positionIdx : undefined;
-      rebuildPositionSelect(posSel, mapRootPc, mapScaleKey, mapPosIdx);
+      var overrides = currentMapping && currentMapping.positionOverrides ? currentMapping.positionOverrides : {};
+      var hasOverrides = Object.keys(overrides).length > 0;
 
-      posSel.addEventListener('change', function () {
-        var val = posSel.value;
-        var mapping = practiceState.progressionScaleMap[g.index];
-        if (!mapping) return;
-        if (val === '') {
-          delete mapping.positionIdx;
-        } else {
-          mapping.positionIdx = parseInt(val);
-        }
-        saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
-        if (practiceState.playing) {
-          if (practiceState.progressionCurrentIdx === g.index) {
-            applyProgChordScale(g.index);
-          }
-        } else {
-          practiceState.progressionCurrentIdx = g.index;
-          applyProgChordScale(g.index);
-          renderProgStrip();
-        }
+      var overrideBtn = document.createElement('button');
+      overrideBtn.className = 'bs-btn' + (hasOverrides ? ' bs-btn-active' : '');
+      overrideBtn.textContent = hasOverrides ? '★ ' + Object.keys(overrides).length : '⚙';
+      overrideBtn.title = 'Asignar posición custom';
+      overrideBtn.style.fontSize = '0.8rem';
+
+      overrideBtn.addEventListener('click', function () {
+        toggleOverridePanel(g.index, row);
       });
 
-      row.appendChild(posSel);
+      row.appendChild(overrideBtn);
       elProgScaleEditor.appendChild(row);
     });
   }
 
-  function rebuildPositionSelect(selectEl, rootPc, scaleKey, currentPosIdx) {
-    selectEl.innerHTML = '';
-    var optAny = document.createElement('option');
-    optAny.value = '';
-    optAny.textContent = 'Pos: global';
-    selectEl.appendChild(optAny);
+  function toggleOverridePanel(chordIdx, parentRow) {
+    // If panel already open, close it
+    var existing = parentRow.nextElementSibling;
+    if (existing && existing.classList.contains('prog-override-panel')) {
+      existing.remove();
+      return;
+    }
 
-    var positions = Engine.generatePositions(rootPc, scaleKey);
+    var mapping = practiceState.progressionScaleMap[chordIdx];
+    if (!mapping) return;
 
-    positions.forEach(function (pos, i) {
-      var opt = document.createElement('option');
-      opt.value = i;
-      var fretText = pos.fretRange[0] + '-' + pos.fretRange[1];
-      opt.textContent = pos.label + ' (' + fretText + ')';
-      if (currentPosIdx !== undefined && currentPosIdx !== null && currentPosIdx === i) {
-        opt.selected = true;
-      }
-      selectEl.appendChild(opt);
-    });
+    var overrides = mapping.positionOverrides || {};
+    var positions = Engine.generatePositions(mapping.rootPc, mapping.scaleKey);
 
-    // Add custom positions
+    // Get custom positions for this scale
+    var customPositions = [];
     if (window.CustomScales) {
-      var custom = window.CustomScales.getByScale(rootPc, scaleKey);
-      custom.forEach(function (cs) {
-        var idx = positions.length;
-        positions.push({ label: '★ ' + cs.positionLabel, fretRange: cs.fretRange, noteData: cs.noteData });
+      customPositions = window.CustomScales.getByScale(mapping.rootPc, mapping.scaleKey);
+    }
+
+    if (customPositions.length === 0) {
+      alert('No hay posiciones custom guardadas para esta escala.\nCreá una en el tab Constructor.');
+      return;
+    }
+
+    var panel = document.createElement('div');
+    panel.className = 'prog-override-panel';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'color:#ffe66d; font-size:0.8rem; margin-bottom:6px; font-weight:600;';
+    title.textContent = 'Overrides: en qué posición usar tu custom';
+    panel.appendChild(title);
+
+    // For each generated position, show: "Pos N → [normal / ★ custom1 / ★ custom2]"
+    positions.forEach(function (pos, posIdx) {
+      var overrideRow = document.createElement('div');
+      overrideRow.style.cssText = 'display:flex; align-items:center; gap:6px; margin-bottom:4px;';
+
+      var label = document.createElement('span');
+      label.style.cssText = 'color:#a0a0b0; font-size:0.8rem; min-width:80px;';
+      label.textContent = pos.label + ':';
+      overrideRow.appendChild(label);
+
+      var oSel = document.createElement('select');
+      oSel.className = 'prog-scale-select';
+      oSel.style.cssText = 'flex:1; font-size:0.8rem;';
+
+      var optNormal = document.createElement('option');
+      optNormal.value = '';
+      optNormal.textContent = '— Normal —';
+      oSel.appendChild(optNormal);
+
+      // Append custom positions as options
+      customPositions.forEach(function (cs, ci) {
+        var customIdx = positions.length + ci;
         var opt = document.createElement('option');
-        opt.value = idx;
-        var fretText = cs.fretRange[0] + '-' + cs.fretRange[1];
-        opt.textContent = '★ ' + cs.positionLabel + ' (' + fretText + ')';
-        if (currentPosIdx !== undefined && currentPosIdx !== null && currentPosIdx === idx) {
+        opt.value = customIdx;
+        opt.textContent = '★ ' + cs.positionLabel + ' (' + cs.name + ')';
+        if (overrides[posIdx] !== undefined && overrides[posIdx] === customIdx) {
           opt.selected = true;
         }
-        selectEl.appendChild(opt);
+        oSel.appendChild(opt);
       });
-    }
+
+      oSel.addEventListener('change', function () {
+        if (!mapping.positionOverrides) mapping.positionOverrides = {};
+        if (oSel.value === '') {
+          delete mapping.positionOverrides[posIdx];
+        } else {
+          mapping.positionOverrides[posIdx] = parseInt(oSel.value);
+        }
+        // Clean up empty overrides
+        if (Object.keys(mapping.positionOverrides).length === 0) {
+          delete mapping.positionOverrides;
+        }
+        saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
+        // Re-apply if this is current chord
+        if (!practiceState.playing) {
+          practiceState.progressionCurrentIdx = chordIdx;
+          applyProgChordScale(chordIdx);
+          renderProgStrip();
+        }
+      });
+
+      overrideRow.appendChild(oSel);
+      panel.appendChild(overrideRow);
+    });
+
+    // Close button
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'bs-btn';
+    closeBtn.textContent = 'Cerrar';
+    closeBtn.style.cssText = 'margin-top:6px; font-size:0.8rem;';
+    closeBtn.addEventListener('click', function () {
+      panel.remove();
+      // Update override button text
+      var ov = mapping.positionOverrides || {};
+      var btn = parentRow.querySelector('.bs-btn');
+      if (btn) {
+        var count = Object.keys(ov).length;
+        btn.textContent = count > 0 ? '★ ' + count : '⚙';
+        btn.className = 'bs-btn' + (count > 0 ? ' bs-btn-active' : '');
+      }
+    });
+    panel.appendChild(closeBtn);
+
+    parentRow.after(panel);
   }
 
   function renderProgStrip() {
