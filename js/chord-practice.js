@@ -45,6 +45,7 @@
     bpm: 100,
     speed: 'normal',
     metronomeOn: true,
+    soundOn: true,
     loopOn: true,
     playing: false,
     paused: false,
@@ -121,6 +122,7 @@
 
     // Toggles
     elMetronome.addEventListener('change', function () { state.metronomeOn = elMetronome.checked; });
+    document.getElementById('cp-sound').addEventListener('change', function () { state.soundOn = this.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
 
     // Play / Pause / Stop
@@ -384,7 +386,7 @@
       // On first beat: play chord + update diagram
       if (isFirstBeat) {
         var voicing = state.voicings[state.currentChordIndex];
-        if (voicing) {
+        if (voicing && state.soundOn) {
           var midi = voicingToMidi(voicing);
           var chordDuration = Math.max((state.beatsPerChord * intervalMs) / 1000, 1.5);
           Audio.playChord(midi, chordDuration);

@@ -44,6 +44,7 @@
     speed: 'normal',
     bpm: 100,
     metronomeOn: true,
+    soundOn: true,
     loopOn: true,
     playing: false,
     // runtime
@@ -114,6 +115,9 @@
     });
     elMetronomeToggle.addEventListener('change', () => {
       practiceState.metronomeOn = elMetronomeToggle.checked;
+    });
+    document.getElementById('practice-sound').addEventListener('change', function () {
+      practiceState.soundOn = this.checked;
     });
     elLoopToggle.addEventListener('change', () => {
       practiceState.loopOn = elLoopToggle.checked;
@@ -671,7 +675,7 @@
       }
 
       // Play note
-      Audio.playNote(midi, noteDuration);
+      if (practiceState.soundOn) Audio.playNote(midi, noteDuration);
 
       // Highlight on fretboard
       FB.clearHighlights();
