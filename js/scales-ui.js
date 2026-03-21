@@ -16,7 +16,7 @@
   let elShowFull, elShowIntervals, elDirection;
   let elPlayPosition, elPlayFull, elTempo;
   let elFlipStrings;
-  let elTabExplore, elTabBank, elExplorePanel, elBankPanel, elBankCount;
+  let elTabExplore, elTabBank, elTabPractice, elExplorePanel, elBankPanel, elPracticePanel, elBankCount;
   let elBankList, elBankExport, elBankImport, elBankFile;
 
   // ── Estado ────────────────────────────────────────────────
@@ -90,8 +90,10 @@
     elPlayFull = document.getElementById('scales-play-full');
     elTempo = document.getElementById('scales-tempo');
     elTabExplore = document.getElementById('scales-tab-explore');
+    elTabPractice = document.getElementById('scales-tab-practice');
     elTabBank = document.getElementById('scales-tab-bank');
     elExplorePanel = document.getElementById('scales-explore-panel');
+    elPracticePanel = document.getElementById('scales-practice-panel');
     elBankPanel = document.getElementById('scales-bank-panel');
     elBankCount = document.getElementById('scales-bank-count');
     elBankList = document.getElementById('scales-bank-list');
@@ -141,6 +143,7 @@
 
     // Events - tabs
     elTabExplore.addEventListener('click', () => switchTab('explore'));
+    elTabPractice.addEventListener('click', () => switchTab('practice'));
     elTabBank.addEventListener('click', () => switchTab('bank'));
 
     // Events - save
@@ -409,13 +412,26 @@
 
   function switchTab(tab) {
     state.currentTab = tab;
+    stopPlayback();
+
     elTabExplore.classList.toggle('active', tab === 'explore');
+    elTabPractice.classList.toggle('active', tab === 'practice');
     elTabBank.classList.toggle('active', tab === 'bank');
     elExplorePanel.style.display = tab === 'explore' ? '' : 'none';
+    elPracticePanel.style.display = tab === 'practice' ? '' : 'none';
     elBankPanel.style.display = tab === 'bank' ? '' : 'none';
 
     if (tab === 'bank') {
       renderBankView();
+    }
+    if (tab === 'practice') {
+      // Stop practice playback when leaving, sync when entering
+      if (window.PracticeMode) {
+        window.PracticeMode.syncFromExplore(state.rootPc, state.scaleKey, state.currentPosition);
+      }
+    }
+    if (tab !== 'practice' && window.PracticeMode) {
+      window.PracticeMode.stop();
     }
   }
 

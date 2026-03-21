@@ -360,5 +360,29 @@
     activeSources = [];
   }
 
-  window.AudioEngine = { playNote, playChord, playScale, stopAll, midiToFreq };
+  // ── Metronome click ──
+
+  /**
+   * Reproduce un click de metrónomo usando un tono corto.
+   * accent = true para el beat 1 (más agudo y fuerte).
+   */
+  function playClick(accent) {
+    var ac = getContext();
+    if (ac.state === 'suspended') ac.resume();
+
+    var now = ac.currentTime;
+    var osc = ac.createOscillator();
+    var gain = ac.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.value = accent ? 1200 : 800;
+    gain.gain.setValueAtTime(accent ? 0.35 : 0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    osc.connect(gain).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  window.AudioEngine = { playNote, playChord, playScale, stopAll, midiToFreq, playClick };
 })();
