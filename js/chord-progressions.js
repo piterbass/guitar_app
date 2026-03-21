@@ -71,6 +71,22 @@
       chords: ['Ebm7','Bbm7','Ebm7','Bbm7','Ebm7','Bbm7','Ebm7','Bbm7',
                'Cbmaj7','Abm7','Bbm7','Ebm7','Cbmaj7','Abm7','Bbm7','Ebm7'],
     },
+    {
+      id: 'stella-by-starlight', name: 'Stella by Starlight', artist: 'Victor Young',
+      category: 'Jazz Standards', beatsPerChord: 4, defaultBpm: 130,
+      chords: ['Em7b5','A7','Cm7','F7','Fm7','Bb7','Ebmaj7','Ebmaj7',
+               'Em7b5','A7','Dm7','Bbm7','Eb7','Fmaj7','Em7b5','A7',
+               'Dm7','Dm7','Bbm7','Eb7','Fmaj7','Fmaj7','Em7b5','A7',
+               'Am7b5','D7','Bm7b5','E7','Am7b5','D7','Gm7','Gm7'],
+    },
+    {
+      id: 'out-of-nowhere', name: 'Out of Nowhere', artist: 'Johnny Green',
+      category: 'Jazz Standards', beatsPerChord: 4, defaultBpm: 130,
+      chords: ['Gmaj7','Gmaj7','Bbm7','Eb7','Gmaj7','Gmaj7','Bm7','E7',
+               'Am7','Am7','Eb7','Eb7','Am7','Am7','Am7','D7',
+               'Gmaj7','Gmaj7','Bbm7','Eb7','Gmaj7','Gmaj7','Bm7','E7',
+               'Am7','Am7','Cm7','F7','Gmaj7','Am7','D7','Gmaj7'],
+    },
 
     // ── Pop/Rock ──
     {
