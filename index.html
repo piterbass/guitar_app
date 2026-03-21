@@ -2545,7 +2545,10 @@
 
       <div class="editor-content-area">
         <div>
-          <span class="editor-label">Letra con acordes entre [corchetes]:</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span class="editor-label" style="margin-bottom:0;">Letra con acordes entre [corchetes]:</span>
+            <button class="btn-small btn-secondary" id="btn-paste-import" title="Pegar texto de LaCuerda.net u otros sitios">Pegar desde web</button>
+          </div>
           <textarea id="editor-content"
             placeholder="[Em7b5]The song [A7b9]is you&#10;[Dm7]The beautiful [G7]song is you&#10;&#10;Escribe los acordes entre [corchetes] antes de cada silaba."></textarea>
         </div>
@@ -2896,6 +2899,27 @@
       </div>
       <div id="diagram-zoom-notes" class="scale-notes" style="padding:0 12px;"></div>
       <div id="diagram-zoom-body"></div>
+    </div>
+  </div>
+
+  <!-- ════ Modal: Importar texto con acordes ════ -->
+  <div class="modal-overlay" id="paste-import-modal">
+    <div class="modal-content" style="max-width:600px;">
+      <div class="modal-header">
+        <h3>Importar letra con acordes</h3>
+        <button class="modal-close" id="paste-import-close">&times;</button>
+      </div>
+      <p style="color:#aaa;font-size:0.85rem;margin-bottom:10px;">
+        Pega el texto copiado de sitios como LaCuerda.net (acordes arriba de la letra).
+        Se convertira automaticamente al formato [Acorde]letra.
+      </p>
+      <textarea id="paste-import-input" rows="14"
+        style="width:100%;background:#0f0f23;color:#eee;border:1px solid #444;border-radius:8px;padding:10px;font-family:monospace;font-size:0.85rem;resize:vertical;"
+        placeholder="Gm9                     Cm9&#10;Te pido la cuenta por favor&#10;Fsus4        F           Bb&#10;Hay tanto silencio en la calle vacia"></textarea>
+      <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn-small btn-secondary" id="paste-import-cancel">Cancelar</button>
+        <button class="btn-primary" id="paste-import-convert">Convertir e insertar</button>
+      </div>
     </div>
   </div>
 

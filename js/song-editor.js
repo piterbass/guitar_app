@@ -15,6 +15,7 @@
     document.getElementById('editor-content').addEventListener('input', updatePreview);
     document.getElementById('btn-editor-save').addEventListener('click', save);
     document.getElementById('btn-editor-cancel').addEventListener('click', cancel);
+    initPasteImport();
   }
 
   /** Abre el editor con una canción existente o nueva. */
@@ -371,6 +372,166 @@
     dragSrcIdx = null;
 
     renderPinnedVoicings();
+  }
+
+  // ── Importar texto pegado (formato LaCuerda.net etc.) ─────
+
+  function initPasteImport() {
+    const modal = document.getElementById('paste-import-modal');
+    const input = document.getElementById('paste-import-input');
+    const btnOpen = document.getElementById('btn-paste-import');
+    const btnConvert = document.getElementById('paste-import-convert');
+    const btnCancel = document.getElementById('paste-import-cancel');
+    const btnClose = document.getElementById('paste-import-close');
+
+    btnOpen.addEventListener('click', () => {
+      input.value = '';
+      modal.style.display = 'flex';
+      input.focus();
+    });
+
+    const close = () => { modal.style.display = 'none'; };
+    btnCancel.addEventListener('click', close);
+    btnClose.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    btnConvert.addEventListener('click', () => {
+      const raw = input.value;
+      if (!raw.trim()) return;
+      const converted = convertPastedText(raw);
+      const contentArea = document.getElementById('editor-content');
+      // Append if there's existing content, otherwise replace
+      if (contentArea.value.trim()) {
+        contentArea.value += '\n\n' + converted;
+      } else {
+        contentArea.value = converted;
+      }
+      updatePreview();
+      close();
+    });
+  }
+
+  /**
+   * Convierte texto con acordes sobre la letra (formato LaCuerda.net)
+   * al formato [Acorde]letra usado por el cancionero.
+   */
+  function convertPastedText(texto) {
+    const lineas = texto.split('\n');
+    const resultado = [];
+    let i = 0;
+
+    while (i < lineas.length) {
+      const linea = lineas[i];
+      const trimmed = linea.trim();
+
+      // Línea vacía → preservar separación
+      if (trimmed === '') {
+        resultado.push('');
+        i++;
+        continue;
+      }
+
+      // ¿Es una línea de acordes?
+      if (isChordLine(linea)) {
+        // Mirar la siguiente línea
+        const next = i + 1 < lineas.length ? lineas[i + 1] : '';
+        const nextTrimmed = next.trim();
+
+        if (nextTrimmed === '' || isChordLine(next) || i + 1 >= lineas.length) {
+          // Línea de solo acordes (intro, puente, etc.)
+          // Preservar etiquetas como "Intro:", "Puente:" y repeticiones "x4"
+          const tokens = linea.split(/\s+/);
+          const parts = tokens.map(t => {
+            if (isChordToken(t)) return '[' + t + ']';
+            return t; // labels like "Intro:", "x4"
+          });
+          resultado.push(parts.join(' '));
+          i++;
+        } else {
+          // Alinear acordes con la línea de letra siguiente
+          resultado.push(mergeChordAndLyric(linea, next));
+          i += 2;
+        }
+      } else {
+        // Línea de texto sin acordes arriba (etiquetas, instrucciones)
+        resultado.push(trimmed);
+        i++;
+      }
+    }
+
+    return resultado.join('\n');
+  }
+
+  /**
+   * Verifica si un token individual es un acorde válido.
+   * Intenta "consumir" el string pieza por pieza.
+   */
+  function isChordToken(t) {
+    const root = t.match(/^[A-G][#b]?/);
+    if (!root) return false;
+    let rest = t.slice(root[0].length);
+    if (rest === '') return true; // Solo raíz: "A", "Bb", etc.
+    // Calidad (maj antes de m para evitar match parcial)
+    rest = rest.replace(/^(?:maj|min|dim|aug|add|sus|m|M)/, '');
+    // Número de extensión
+    rest = rest.replace(/^[0-9]+/, '');
+    // Sufijos adicionales como sus4 después del número (ej: D7sus4)
+    rest = rest.replace(/sus[0-9]*/g, '');
+    // Extensiones entre paréntesis PRIMERO (ej: (#9), (b9)) — antes de sueltas
+    rest = rest.replace(/\([#b]?[0-9]+\)/g, '');
+    // Extensiones sueltas con # o b (ej: b5, #11)
+    rest = rest.replace(/[#b][0-9]+/g, '');
+    // Bajo de slash chord (ej: /Bb)
+    rest = rest.replace(/\/[A-G][#b]?$/, '');
+    return rest === '';
+  }
+
+  /** Detecta si una línea es predominantemente acordes. */
+  function isChordLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    const tokens = trimmed.split(/\s+/);
+    let chordCount = 0;
+    for (const t of tokens) {
+      if (isChordToken(t)) chordCount++;
+      else if (!/^[A-Za-záéíóúñü]+:$/i.test(t) && !/^x\d+$/i.test(t)) return false;
+    }
+    return chordCount > 0;
+  }
+
+  /** Encuentra acordes y sus posiciones en una línea. */
+  function findChordsInLine(line) {
+    const results = [];
+    const re = /\S+/g;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      if (isChordToken(m[0])) {
+        results.push({ name: m[0], pos: m.index });
+      }
+    }
+    return results;
+  }
+
+  /** Fusiona una línea de acordes con la línea de letra debajo, por posición columnar. */
+  function mergeChordAndLyric(chordLine, lyricLine) {
+    const chords = findChordsInLine(chordLine);
+    if (chords.length === 0) return lyricLine.trimEnd();
+
+    let result = lyricLine.trimEnd();
+    // Extender la letra si los acordes caen más allá
+    const maxPos = chords[chords.length - 1].pos;
+    if (maxPos > result.length) {
+      result = result + ' '.repeat(maxPos - result.length + 1);
+    }
+
+    // Insertar de atrás para adelante para preservar posiciones
+    for (let j = chords.length - 1; j >= 0; j--) {
+      const c = chords[j];
+      const insertPos = Math.min(c.pos, result.length);
+      result = result.slice(0, insertPos) + '[' + c.name + ']' + result.slice(insertPos);
+    }
+
+    return result.trimEnd();
   }
 
   function save() {
