@@ -74,10 +74,18 @@
     {
       id: 'stella-by-starlight', name: 'Stella by Starlight', artist: 'Victor Young',
       category: 'Jazz Standards', beatsPerChord: 4, defaultBpm: 130,
-      chords: ['Em7b5','A7','Cm7','F7','Fm7','Bb7','Ebmaj7','Ebmaj7',
-               'Em7b5','A7','Dm7','Bbm7','Eb7','Fmaj7','Em7b5','A7',
-               'Dm7','Dm7','Bbm7','Eb7','Fmaj7','Fmaj7','Em7b5','A7',
-               'Am7b5','D7','Bm7b5','E7','Am7b5','D7','Gm7','Gm7'],
+      chords: [
+        // Verse 1
+        'Em7b5','A7b9','Cm','F7',
+        'Fm7','Bb7','Ebmaj7','Ab7',
+        'Bbmaj7','Em7b5','A7b9','Dm7','Bbm7','Eb7',
+        'Fmaj7','Em7b5','A7','Am7b5','D7',
+        // Chorus
+        'G7#5','Cm7','Ab7','Bbmaj7',
+        // Verse 2
+        'Em7b5','A7b9','Dm7b5','G7b9',
+        'Cm7b5','F7b9','Bbmaj7',
+      ],
     },
     {
       id: 'out-of-nowhere', name: 'Out of Nowhere', artist: 'Johnny Green',
