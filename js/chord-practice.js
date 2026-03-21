@@ -29,12 +29,14 @@
   let elSpeed, elBpmDisplay, elBpmInput;
   let elMetronome, elLoop;
   let elPlay, elStop, elBeatIndicator;
+  let elPositionZone;
 
   // ── State ──
   let state = {
     selectedId: null,
     category: 'all',
     difficulty: 'easy',
+    positionZone: 'all',
     chords: [],
     voicings: [],
     beatsPerChord: 4,
@@ -70,6 +72,7 @@
     elPlay          = document.getElementById('cp-play');
     elStop          = document.getElementById('cp-stop');
     elBeatIndicator = document.getElementById('cp-beat-indicator');
+    elPositionZone  = document.getElementById('cp-position-zone');
 
     if (!elCategory || !elProgression) return;
 
@@ -90,6 +93,16 @@
       elDifficultyToggle.querySelectorAll('.cp-diff-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.difficulty = btn.dataset.diff;
+      if (state.chords.length > 0) {
+        stop();
+        computeVoicings();
+        renderCurrentChord();
+      }
+    });
+
+    // Position zone
+    elPositionZone.addEventListener('change', function () {
+      state.positionZone = elPositionZone.value;
       if (state.chords.length > 0) {
         stop();
         computeVoicings();
@@ -216,17 +229,39 @@
     }
   }
 
+  function parseZone(zone) {
+    if (!zone || zone === 'all') return {};
+    var parts = zone.split('-');
+    return { minFret: parseInt(parts[0]), maxFret: parseInt(parts[1]) };
+  }
+
   function computeVoicings() {
+    var zone = parseZone(state.positionZone);
+
     state.voicings = state.chords.map(function (chordName, i) {
       var parsed = Parser.parseChord(chordName);
       if (!parsed) return null;
 
       var category = getCategoryForDifficulty(state.difficulty, i);
-      var results = Voicings.findVoicings(parsed, { category: category });
+      var opts = { category: category };
+      if (zone.minFret !== undefined) {
+        opts.minFret = zone.minFret;
+        opts.maxFret = zone.maxFret;
+      }
+      var results = Voicings.findVoicings(parsed, opts);
 
-      // Fallback to common if no results
+      // Fallback to common if no results in this zone
       if (results.length === 0 && category !== 'common') {
-        results = Voicings.findVoicings(parsed, { category: 'common' });
+        opts.category = 'common';
+        results = Voicings.findVoicings(parsed, opts);
+      }
+
+      // Fallback to any zone if still no results
+      if (results.length === 0 && zone.minFret !== undefined) {
+        results = Voicings.findVoicings(parsed, { category: category });
+        if (results.length === 0 && category !== 'common') {
+          results = Voicings.findVoicings(parsed, { category: 'common' });
+        }
       }
 
       return results.length > 0 ? results[0] : null;

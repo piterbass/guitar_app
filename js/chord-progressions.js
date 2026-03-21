@@ -189,22 +189,55 @@
     {
       id: 'balada-para-un-loco', name: 'Balada para un loco', artist: 'Piazzolla / Ferrer',
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 100,
-      chords: ['Cm','Fm','G7','Cm','Ab','G7','Cm','Cm'],
+      chords: [
+        // Recitado (vals)
+        'Em','Em','Em','Em','Em','Em','F','F','F','F','Em','Em','F#7','B7','Em',
+        // Cantado - estrofa
+        'E','B7','Bm','C#7','F#m','Am','E','F#7','B7','E',
+        // Estribillo
+        'Em','Em','F','F','Em','Em','F#7','B7',
+        'Em','Em','F','F','Em','Em','F#7','B7','Em',
+        // Modulación (Sol mayor)
+        'G','D7','Dm','E7','Am','D7','G','D7','G',
+        // Final
+        'Em','C','E',
+      ],
     },
     {
       id: 'muchacha-ojos-de-papel', name: 'Muchacha ojos de papel', artist: 'Almendra',
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 90,
-      chords: ['D','A','Bm','F#m','G','A','D','D'],
+      chords: [
+        // Estrofa
+        'G','D/F#','Em7','Am7','D',
+        'G','D/F#','Em7','Am7','D',
+        // Puente (bajo descendente)
+        'Em','Em/D#','Em/D','Em/C#',
+        // Estribillo
+        'C','G/B','Am7','G','Bb',
+        'C','G/B','Am7','G',
+      ],
     },
     {
       id: 'solo-le-pido-a-dios', name: 'Solo le pido a Dios', artist: 'León Gieco',
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 90,
-      chords: ['Em','Bm','C','G','Am','Em','B7','Em'],
+      chords: [
+        'Gadd2','Am7/G','C/G','Gadd2',
+        'Bm','Am','Dsus2','D',
+        'Em','Bm','Am','D',
+        'G','Am7/G','C/G','G',
+      ],
     },
     {
       id: 'cancion-para-mi-muerte', name: 'Canción para mi muerte', artist: 'Sui Generis',
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 100,
-      chords: ['A','D','E','A','F#m','D','E','A'],
+      chords: [
+        // Estrofa
+        'G','F9','C','G',
+        'G','F9','C','Dsus4','D',
+        // Estribillo
+        'Bm','Em','D#','D','G',
+        'Em','D','G',
+      ],
     },
     {
       id: 'cabildo-y-juramento', name: 'Cabildo y Juramento', artist: 'Conociendo Rusia',
