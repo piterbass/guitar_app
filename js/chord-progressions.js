@@ -171,6 +171,30 @@
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 100,
       chords: ['A','D','E','A','F#m','D','E','A'],
     },
+    {
+      id: 'cabildo-y-juramento', name: 'Cabildo y Juramento', artist: 'Conociendo Rusia',
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 120,
+      chords: ['D','F#m','Bm','A','G','D','A','D',
+               'D','F#m','Bm','A','G','D','A','D'],
+    },
+    {
+      id: 'tres-agujas', name: 'Tres agujas', artist: 'Fito Páez',
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 90,
+      chords: ['Am','G','F','E7','Am','G','F','E7',
+               'Dm','Am','E7','Am','Dm','Am','E7','Am'],
+    },
+    {
+      id: 'promesas-sobre-el-bidet', name: 'Promesas sobre el bidet', artist: 'Charly García',
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 130,
+      chords: ['E','B','C#m','A','E','B','A','A',
+               'E','B','C#m','A','E','B','A','E'],
+    },
+    {
+      id: 'seminare', name: 'Seminare', artist: 'Serú Girán',
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 125,
+      chords: ['A','D','E','A','A','D','E','A',
+               'F#m','D','E','A','F#m','D','E','A'],
+    },
   ];
 
   // ── Generadores de ciclos ──────────────────────────────────
