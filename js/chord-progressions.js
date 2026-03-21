@@ -134,7 +134,12 @@
     {
       id: 'zamba-esperanza', name: 'Zamba de mi esperanza', artist: 'Luis Profili',
       category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 90,
-      chords: ['Em','Am','B7','Em','Am','Em','B7','Em'],
+      chords: [
+        // Estrofa
+        'E','E','B7','B7','A','E','B7','E','E7',
+        // Estribillo
+        'E','B7','B7','E','E','B7','E','E7',
+      ],
     },
     {
       id: 'la-cumparsita', name: 'La cumparsita', artist: 'G. H. Matos Rodríguez',
