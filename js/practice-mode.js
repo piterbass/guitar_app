@@ -335,23 +335,29 @@
     practiceState.scalePCs = getScalePCs(mapping.rootPc, mapping.scaleKey);
     practiceState.positions = Engine.generatePositions(mapping.rootPc, mapping.scaleKey);
 
-    // Keep selected position if valid, otherwise reset to 0
-    if (practiceState.selectedPosition >= practiceState.positions.length) {
-      practiceState.selectedPosition = 0;
-    }
-
     // Update UI selectors
     if (elRootSelect) elRootSelect.value = mapping.rootPc;
     if (elTypeSelect) elTypeSelect.value = mapping.scaleKey;
     populatePositionSelector();
+
+    // Apply per-chord position if set, otherwise keep current
+    if (mapping.positionIdx !== undefined && mapping.positionIdx !== null && mapping.positionIdx >= 0) {
+      practiceState.selectedPosition = Math.min(mapping.positionIdx, practiceState.positions.length - 1);
+    } else if (practiceState.selectedPosition >= practiceState.positions.length) {
+      practiceState.selectedPosition = 0;
+    }
+
     if (elPositionSelect) elPositionSelect.value = practiceState.selectedPosition;
     renderFretboard();
 
     // Update info
     var scaleName = window.ScaleDetector.SCALE_LABELS[mapping.scaleKey] || mapping.scaleKey;
     var rootName = window.MusicTheory.pcToName(mapping.rootPc);
+    var posLabel = practiceState.positions[practiceState.selectedPosition]
+      ? practiceState.positions[practiceState.selectedPosition].label : '';
     if (elProgInfo) {
-      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName;
+      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName +
+        (mapping.positionIdx >= 0 ? ' [' + posLabel + ']' : '');
     }
 
     // Calculate how many notes per chord
@@ -451,11 +457,12 @@
         var parts = sel.value.split('|');
         var rootPc = parseInt(parts[0]);
         var scaleKey = parts[1];
+        // Keep existing positionIdx if scale didn't change root
+        var prevMapping = practiceState.progressionScaleMap[g.index] || {};
         practiceState.progressionScaleMap[g.index] = { rootPc: rootPc, scaleKey: scaleKey };
-        // Save to localStorage
         saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
-        // If playing, only update if this is the current chord
-        // If not playing, navigate to this chord and show the new scale
+        // Rebuild position selector for this row
+        rebuildPositionSelect(posSel, rootPc, scaleKey, null);
         if (practiceState.playing) {
           if (practiceState.progressionCurrentIdx === g.index) {
             applyProgChordScale(g.index);
@@ -468,8 +475,78 @@
       });
 
       row.appendChild(sel);
+
+      // Position selector per chord
+      var posSel = document.createElement('select');
+      posSel.className = 'prog-scale-select prog-pos-select';
+      posSel.title = 'Posición (opcional)';
+      var mapRootPc = currentMapping ? currentMapping.rootPc : (parsed ? parsed.rootPc : 0);
+      var mapScaleKey = currentMapping ? currentMapping.scaleKey : 'major';
+      var mapPosIdx = currentMapping ? currentMapping.positionIdx : undefined;
+      rebuildPositionSelect(posSel, mapRootPc, mapScaleKey, mapPosIdx);
+
+      posSel.addEventListener('change', function () {
+        var val = posSel.value;
+        var mapping = practiceState.progressionScaleMap[g.index];
+        if (!mapping) return;
+        if (val === '') {
+          delete mapping.positionIdx;
+        } else {
+          mapping.positionIdx = parseInt(val);
+        }
+        saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
+        if (practiceState.playing) {
+          if (practiceState.progressionCurrentIdx === g.index) {
+            applyProgChordScale(g.index);
+          }
+        } else {
+          practiceState.progressionCurrentIdx = g.index;
+          applyProgChordScale(g.index);
+          renderProgStrip();
+        }
+      });
+
+      row.appendChild(posSel);
       elProgScaleEditor.appendChild(row);
     });
+  }
+
+  function rebuildPositionSelect(selectEl, rootPc, scaleKey, currentPosIdx) {
+    selectEl.innerHTML = '';
+    var optAny = document.createElement('option');
+    optAny.value = '';
+    optAny.textContent = 'Pos: global';
+    selectEl.appendChild(optAny);
+
+    var positions = Engine.generatePositions(rootPc, scaleKey);
+
+    positions.forEach(function (pos, i) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      var fretText = pos.fretRange[0] + '-' + pos.fretRange[1];
+      opt.textContent = pos.label + ' (' + fretText + ')';
+      if (currentPosIdx !== undefined && currentPosIdx !== null && currentPosIdx === i) {
+        opt.selected = true;
+      }
+      selectEl.appendChild(opt);
+    });
+
+    // Add custom positions
+    if (window.CustomScales) {
+      var custom = window.CustomScales.getByScale(rootPc, scaleKey);
+      custom.forEach(function (cs) {
+        var idx = positions.length;
+        positions.push({ label: '★ ' + cs.positionLabel, fretRange: cs.fretRange, noteData: cs.noteData });
+        var opt = document.createElement('option');
+        opt.value = idx;
+        var fretText = cs.fretRange[0] + '-' + cs.fretRange[1];
+        opt.textContent = '★ ' + cs.positionLabel + ' (' + fretText + ')';
+        if (currentPosIdx !== undefined && currentPosIdx !== null && currentPosIdx === idx) {
+          opt.selected = true;
+        }
+        selectEl.appendChild(opt);
+      });
+    }
   }
 
   function renderProgStrip() {
