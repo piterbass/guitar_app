@@ -25,6 +25,7 @@
   let elDirection;
   let elSpeed;
   let elBpmDisplay, elBpmInput;
+  let elBankSelect;
   let elMetronomeToggle;
   let elPlayBtn, elStopBtn;
   let elFretboard;
@@ -70,16 +71,19 @@
     elBeatIndicator    = document.getElementById('practice-beat-indicator');
     elLoopToggle       = document.getElementById('practice-loop');
     elBpmInput         = document.getElementById('practice-bpm-input');
+    elBankSelect       = document.getElementById('practice-bank-select');
 
     if (!elRootSelect || !elTypeSelect) return;
 
     // Populate selectors (reuse MusicTheory data)
     populateRootSelector();
     populateScaleTypeSelector();
+    populateBankSelector();
 
     // Events
-    elRootSelect.addEventListener('change', onScaleChanged);
-    elTypeSelect.addEventListener('change', onScaleChanged);
+    elRootSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
+    elTypeSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
+    elBankSelect.addEventListener('change', onBankSelected);
     elPositionSelect.addEventListener('change', onPositionChanged);
     elDirection.addEventListener('change', () => {
       practiceState.direction = elDirection.value;
@@ -141,6 +145,38 @@
       });
       elTypeSelect.appendChild(optgroup);
     });
+  }
+
+  // ── Mis Escalas (bank) ──
+
+  function populateBankSelector() {
+    const Bank = window.ScaleBank;
+    if (!Bank || !elBankSelect) return;
+    const scales = Bank.getAll();
+
+    // Keep the first placeholder option
+    elBankSelect.innerHTML = '<option value="">— Mis Escalas —</option>';
+    scales.forEach((scale, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = scale.label;
+      elBankSelect.appendChild(opt);
+    });
+  }
+
+  function onBankSelected() {
+    const Bank = window.ScaleBank;
+    if (!Bank || !elBankSelect) return;
+    const idx = elBankSelect.value;
+    if (idx === '') return;
+
+    const scales = Bank.getAll();
+    const scale = scales[parseInt(idx)];
+    if (!scale) return;
+
+    elRootSelect.value = scale.rootPc;
+    elTypeSelect.value = scale.scaleKey;
+    onScaleChanged();
   }
 
   // ── Scale / Position changes ──
@@ -382,6 +418,8 @@
   // ── Sync from Explore tab ──
 
   function syncFromExplore(rootPc, scaleKey, positionIdx) {
+    populateBankSelector();
+    if (elBankSelect) elBankSelect.value = '';
     if (elRootSelect) elRootSelect.value = rootPc;
     if (elTypeSelect) elTypeSelect.value = scaleKey;
     onScaleChanged();
