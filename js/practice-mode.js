@@ -25,7 +25,7 @@
   let elDirection;
   let elSpeed;
   let elBpmDisplay, elBpmInput;
-  let elProgSelect, elProgStrip, elProgInfo, elProgScaleEditor, elProgEditorToggle;
+  let elProgCategory, elProgSelect, elProgStrip, elProgInfo, elProgScaleEditor, elProgEditorToggle;
   let elBankSelect;
   let elMetronomeToggle;
   let elPlayBtn, elPauseBtn, elStopBtn;
@@ -40,6 +40,7 @@
     scalePCs: [],
     positions: [],
     selectedPosition: 0,
+    _globalPosition: 0,  // user-chosen position (before overrides)
     direction: 'ascending',
     speed: 'normal',
     bpm: 100,
@@ -83,6 +84,7 @@
     elLoopToggle       = document.getElementById('practice-loop');
     elBpmInput         = document.getElementById('practice-bpm-input');
     elBankSelect       = document.getElementById('practice-bank-select');
+    elProgCategory     = document.getElementById('practice-prog-category');
     elProgSelect       = document.getElementById('practice-prog-select');
     elProgStrip        = document.getElementById('practice-prog-strip');
     elProgInfo         = document.getElementById('practice-prog-info');
@@ -101,6 +103,9 @@
     elRootSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
     elTypeSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
     elBankSelect.addEventListener('change', onBankSelected);
+    if (elProgCategory) elProgCategory.addEventListener('change', function () {
+      populateProgSelector();
+    });
     if (elProgSelect) elProgSelect.addEventListener('change', onProgSelected);
     if (elProgEditorToggle) elProgEditorToggle.addEventListener('click', toggleScaleEditor);
     elPositionSelect.addEventListener('change', onPositionChanged);
@@ -208,37 +213,54 @@
     if (!elProgSelect) return;
     elProgSelect.innerHTML = '<option value="">— Sin progresión —</option>';
 
-    // Built-in progressions
-    if (window.ChordProgressions) {
-      var all = window.ChordProgressions.getAll();
-      var optgroup = document.createElement('optgroup');
-      optgroup.label = 'Biblioteca';
-      all.forEach(function (p) {
-        var opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name + (p.artist ? ' – ' + p.artist : '');
-        optgroup.appendChild(opt);
-      });
-      elProgSelect.appendChild(optgroup);
-    }
+    var category = elProgCategory ? elProgCategory.value : 'all';
 
-    // User's songbook songs
-    if (window.Songbook) {
-      var songs = window.Songbook.getSongs();
-      var hasSongs = false;
-      var songGroup = document.createElement('optgroup');
-      songGroup.label = 'Mis Canciones';
-      songs.forEach(function (song) {
-        var chords = window.Songbook.extractChords(song.content);
-        if (chords.length === 0) return;
-        hasSongs = true;
-        var opt = document.createElement('option');
-        opt.value = 'song-' + song.id;
-        opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '');
-        opt.dataset.chords = JSON.stringify(chords);
-        songGroup.appendChild(opt);
-      });
-      if (hasSongs) elProgSelect.appendChild(songGroup);
+    if (category === 'mis-canciones') {
+      // User's songbook songs only
+      if (window.Songbook) {
+        var songs = window.Songbook.getSongs();
+        songs.forEach(function (song) {
+          var chords = window.Songbook.extractChords(song.content);
+          if (chords.length === 0) return;
+          var opt = document.createElement('option');
+          opt.value = 'song-' + song.id;
+          opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '');
+          opt.dataset.chords = JSON.stringify(chords);
+          elProgSelect.appendChild(opt);
+        });
+      }
+    } else {
+      // Built-in progressions (filtered by category)
+      if (window.ChordProgressions) {
+        var list = category === 'all'
+          ? window.ChordProgressions.getAll()
+          : window.ChordProgressions.getByCategory(category);
+        list.forEach(function (p) {
+          var opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name + (p.artist ? ' – ' + p.artist : '');
+          elProgSelect.appendChild(opt);
+        });
+      }
+
+      // Also show songbook songs when "all" is selected
+      if (category === 'all' && window.Songbook) {
+        var songs = window.Songbook.getSongs();
+        var hasSongs = false;
+        var songGroup = document.createElement('optgroup');
+        songGroup.label = 'Mis Canciones';
+        songs.forEach(function (song) {
+          var chords = window.Songbook.extractChords(song.content);
+          if (chords.length === 0) return;
+          hasSongs = true;
+          var opt = document.createElement('option');
+          opt.value = 'song-' + song.id;
+          opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '');
+          opt.dataset.chords = JSON.stringify(chords);
+          songGroup.appendChild(opt);
+        });
+        if (hasSongs) elProgSelect.appendChild(songGroup);
+      }
     }
   }
 
@@ -340,17 +362,21 @@
     if (elTypeSelect) elTypeSelect.value = mapping.scaleKey;
     populatePositionSelector();
 
-    // Check for position override at the current global position
-    var globalPos = practiceState.selectedPosition;
+    // Check for position override at the user's chosen global position
+    var globalPos = practiceState._globalPosition;
     var overrides = mapping.positionOverrides || {};
     if (overrides[globalPos] !== undefined) {
       // Override: use custom position instead of the generated one
       var overrideIdx = overrides[globalPos];
       if (overrideIdx < practiceState.positions.length) {
         practiceState.selectedPosition = overrideIdx;
+      } else {
+        // Override index out of range, fall back to global
+        practiceState.selectedPosition = Math.min(globalPos, practiceState.positions.length - 1);
       }
-    } else if (practiceState.selectedPosition >= practiceState.positions.length) {
-      practiceState.selectedPosition = 0;
+    } else {
+      // No override: restore to global position (clamped to valid range)
+      practiceState.selectedPosition = Math.min(globalPos, practiceState.positions.length - 1);
     }
 
     if (elPositionSelect) elPositionSelect.value = practiceState.selectedPosition;
@@ -719,8 +745,16 @@
     if (elStopBtn) { elStopBtn.disabled = true; elStopBtn.style.opacity = '0.5'; }
     if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
 
-    practiceState.selectedPosition = parseInt(elPositionSelect.value) || 0;
-    renderFretboard();
+    var pos = parseInt(elPositionSelect.value) || 0;
+    practiceState.selectedPosition = pos;
+    practiceState._globalPosition = pos;
+
+    // If in progression mode, re-apply to check for overrides
+    if (practiceState.progressionMode) {
+      applyProgChordScale(practiceState.progressionCurrentIdx);
+    } else {
+      renderFretboard();
+    }
   }
 
   function onSpeedChanged() {

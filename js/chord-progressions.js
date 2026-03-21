@@ -320,6 +320,22 @@
         'G','A/G','Gmaj7','C/G','G','D/G','C/G','G',
       ],
     },
+    {
+      id: 'corazon-delator', name: 'Corazón Delator', artist: 'Soda Stereo',
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 120,
+      chords: [
+        // Estrofa
+        'Em','G9','Em','G9','Am','C9','A7','Cmaj7','Bm7','Cmaj7','B7sus4','B7',
+        // Estribillo
+        'F#m','F','Em','F#m','F',
+        // Puente
+        'D/C','A','G',
+        // Parte C
+        'Em','C','Em','C','Bm','Bb','F','D','C',
+        // Mantra / Outro
+        'D','C','Em',
+      ],
+    },
   ];
 
   // ── Generadores de ciclos ──────────────────────────────────
