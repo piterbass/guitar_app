@@ -527,7 +527,21 @@
   }
 
   function onPositionChanged() {
-    stop();
+    // Stop playback without resetting progression position
+    if (practiceState._intervalId) {
+      clearInterval(practiceState._intervalId);
+      practiceState._intervalId = null;
+    }
+    practiceState.playing = false;
+    practiceState.paused = false;
+    practiceState._noteIndex = 0;
+    Audio.stopAll();
+    FB.clearHighlights();
+    if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
+    if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }
+    if (elStopBtn) { elStopBtn.disabled = true; elStopBtn.style.opacity = '0.5'; }
+    if (elBeatIndicator) { elBeatIndicator.innerHTML = ''; }
+
     practiceState.selectedPosition = parseInt(elPositionSelect.value) || 0;
     renderFretboard();
   }
