@@ -143,8 +143,17 @@
     },
     {
       id: 'la-cumparsita', name: 'La cumparsita', artist: 'G. H. Matos Rodríguez',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 120,
-      chords: ['Am','Dm','E7','Am','Dm','Am','E7','Am'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 110,
+      chords: [
+        // Intro
+        'Am','G','F','E','Am','E','Am','Dm','Am','E','Am','G','F',
+        // Estrofa 1
+        'E','E','Am','Am','E','E','Am','Am',
+        'Dm','Dm','Am','Am','E','E','Am','Am',
+        // Estrofa 2
+        'Am','Am','E','E','E','E','Am','Am',
+        'Am','Am','Dm','Dm','Am','E','Am','Am',
+      ],
     },
     {
       id: 'el-dia-que-me-quieras', name: 'El día que me quieras', artist: 'Carlos Gardel',
