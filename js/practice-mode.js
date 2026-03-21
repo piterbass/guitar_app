@@ -334,12 +334,17 @@
     practiceState.scaleKey = mapping.scaleKey;
     practiceState.scalePCs = getScalePCs(mapping.rootPc, mapping.scaleKey);
     practiceState.positions = Engine.generatePositions(mapping.rootPc, mapping.scaleKey);
-    practiceState.selectedPosition = 0;
+
+    // Keep selected position if valid, otherwise reset to 0
+    if (practiceState.selectedPosition >= practiceState.positions.length) {
+      practiceState.selectedPosition = 0;
+    }
 
     // Update UI selectors
     if (elRootSelect) elRootSelect.value = mapping.rootPc;
     if (elTypeSelect) elTypeSelect.value = mapping.scaleKey;
     populatePositionSelector();
+    if (elPositionSelect) elPositionSelect.value = practiceState.selectedPosition;
     renderFretboard();
 
     // Update info
