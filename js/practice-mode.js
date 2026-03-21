@@ -556,7 +556,6 @@
         opt.value = idx;
         var fretText = cs.fretRange[0] + '-' + cs.fretRange[1];
         opt.textContent = '★ ' + cs.positionLabel + ' (' + cs.name + ', trastes ' + fretText + ')';
-        opt.style.color = '#ffe66d';
         elPositionSelect.appendChild(opt);
       });
     }
