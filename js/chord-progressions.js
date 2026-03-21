@@ -157,8 +157,20 @@
     },
     {
       id: 'el-dia-que-me-quieras', name: 'El día que me quieras', artist: 'Carlos Gardel',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 80,
-      chords: ['C','E7','Am','C7','F','Fm','C','G7'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 75,
+      chords: [
+        // Verso
+        'D','C#m7b5','Bm7','E7','F#7',
+        'Bm','E7','Gadd9','A7b9',
+        'D','Ebdim7','A','F#7',
+        'B7','E7','Gadd9','A7b9','A','Fmaj7#5',
+        // Estribillo 1
+        'D','F#7','Bm','D7','G','B7','Em',
+        'A7','F#7','Bm','E7','Gadd9','A7b9',
+        // Estribillo 2
+        'D','F#7','Bm','D7','G','B7','Em',
+        'F#7','B7','Em7','Gm','F#m','Em7','A','D',
+      ],
     },
     {
       id: 'alfonsina-y-el-mar', name: 'Alfonsina y el mar', artist: 'Ariel Ramírez',
