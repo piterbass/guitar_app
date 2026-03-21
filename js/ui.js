@@ -38,6 +38,10 @@
     const target = document.getElementById('section-' + sectionName);
     if (target) target.classList.add('active');
 
+    // Cerrar panel de backup si está abierto
+    var backupPanel = document.getElementById('backup-panel');
+    if (backupPanel) backupPanel.style.display = 'none';
+
     // Actualizar nav activo
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     if (sectionName === 'chords') {
