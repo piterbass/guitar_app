@@ -25,7 +25,7 @@
   let elDirection;
   let elSpeed;
   let elBpmDisplay, elBpmInput;
-  let elProgSelect, elProgStrip, elProgInfo;
+  let elProgSelect, elProgStrip, elProgInfo, elProgScaleEditor, elProgEditorToggle;
   let elBankSelect;
   let elMetronomeToggle;
   let elPlayBtn, elStopBtn;
@@ -53,7 +53,9 @@
     _beatCount: 0,
     // progression mode
     progressionMode: false,
+    progressionId: null,
     progressionChords: [],
+    progressionScaleMap: [],   // [{ rootPc, scaleKey }] per chord
     progressionCurrentIdx: 0,
     progressionNotesPlayed: 0,
     progressionNotesPerChord: 0,
@@ -82,6 +84,8 @@
     elProgSelect       = document.getElementById('practice-prog-select');
     elProgStrip        = document.getElementById('practice-prog-strip');
     elProgInfo         = document.getElementById('practice-prog-info');
+    elProgScaleEditor  = document.getElementById('practice-prog-scale-editor');
+    elProgEditorToggle = document.getElementById('practice-prog-editor-toggle');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -96,6 +100,7 @@
     elTypeSelect.addEventListener('change', () => { elBankSelect.value = ''; onScaleChanged(); });
     elBankSelect.addEventListener('change', onBankSelected);
     if (elProgSelect) elProgSelect.addEventListener('change', onProgSelected);
+    if (elProgEditorToggle) elProgEditorToggle.addEventListener('click', toggleScaleEditor);
     elPositionSelect.addEventListener('change', onPositionChanged);
     elDirection.addEventListener('change', () => {
       practiceState.direction = elDirection.value;
@@ -231,14 +236,37 @@
     }
   }
 
+  // ── localStorage for scale maps ──
+
+  var PROG_SCALES_KEY = 'practice-prog-scale-maps';
+
+  function loadSavedScaleMap(progId) {
+    try {
+      var all = JSON.parse(localStorage.getItem(PROG_SCALES_KEY)) || {};
+      return all[progId] || null;
+    } catch (e) { return null; }
+  }
+
+  function saveScaleMap(progId, scaleMap) {
+    try {
+      var all = JSON.parse(localStorage.getItem(PROG_SCALES_KEY)) || {};
+      all[progId] = scaleMap;
+      localStorage.setItem(PROG_SCALES_KEY, JSON.stringify(all));
+    } catch (e) { /* ignore */ }
+  }
+
   function onProgSelected() {
     stop();
     var id = elProgSelect.value;
     if (!id) {
       practiceState.progressionMode = false;
       practiceState.progressionChords = [];
+      practiceState.progressionScaleMap = [];
+      practiceState.progressionId = null;
       if (elProgStrip) elProgStrip.style.display = 'none';
       if (elProgInfo) elProgInfo.textContent = '';
+      if (elProgScaleEditor) elProgScaleEditor.style.display = 'none';
+      if (elProgEditorToggle) elProgEditorToggle.style.display = 'none';
       return;
     }
 
@@ -249,7 +277,6 @@
       var opt = elProgSelect.querySelector('option[value="' + id + '"]');
       if (opt && opt.dataset.chords) {
         chords = JSON.parse(opt.dataset.chords);
-        // Deduplicate consecutive same chords
         var unique = [chords[0]];
         for (var i = 1; i < chords.length; i++) {
           if (chords[i] !== chords[i - 1]) unique.push(chords[i]);
@@ -265,46 +292,166 @@
     if (!chords || chords.length === 0) return;
 
     practiceState.progressionMode = true;
+    practiceState.progressionId = id;
     practiceState.progressionChords = chords;
     practiceState.progressionCurrentIdx = 0;
     practiceState.progressionNotesPlayed = 0;
 
-    // Apply first chord's suggested scale
+    // Build scale map: load saved or auto-suggest
+    var saved = loadSavedScaleMap(id);
+    if (saved && saved.length === chords.length) {
+      practiceState.progressionScaleMap = saved;
+    } else {
+      practiceState.progressionScaleMap = chords.map(function (ch) {
+        return window.ChordProgressions.suggestScale(ch);
+      });
+    }
+
+    // Apply first chord
     applyProgChordScale(0);
 
-    // Render progression strip
+    // Render
     renderProgStrip();
+    renderScaleEditor();
     if (elProgStrip) elProgStrip.style.display = '';
+    if (elProgEditorToggle) elProgEditorToggle.style.display = '';
   }
 
   function applyProgChordScale(chordIdx) {
     if (chordIdx >= practiceState.progressionChords.length) return;
     var chordName = practiceState.progressionChords[chordIdx];
-    var suggestion = window.ChordProgressions.suggestScale(chordName);
+    var mapping = practiceState.progressionScaleMap[chordIdx];
+    if (!mapping) mapping = window.ChordProgressions.suggestScale(chordName);
     var { getScalePCs } = window.MusicTheory;
 
-    practiceState.rootPc = suggestion.rootPc;
-    practiceState.scaleKey = suggestion.scaleKey;
-    practiceState.scalePCs = getScalePCs(suggestion.rootPc, suggestion.scaleKey);
-    practiceState.positions = Engine.generatePositions(suggestion.rootPc, suggestion.scaleKey);
+    practiceState.rootPc = mapping.rootPc;
+    practiceState.scaleKey = mapping.scaleKey;
+    practiceState.scalePCs = getScalePCs(mapping.rootPc, mapping.scaleKey);
+    practiceState.positions = Engine.generatePositions(mapping.rootPc, mapping.scaleKey);
     practiceState.selectedPosition = 0;
 
     // Update UI selectors
-    if (elRootSelect) elRootSelect.value = suggestion.rootPc;
-    if (elTypeSelect) elTypeSelect.value = suggestion.scaleKey;
+    if (elRootSelect) elRootSelect.value = mapping.rootPc;
+    if (elTypeSelect) elTypeSelect.value = mapping.scaleKey;
     populatePositionSelector();
     renderFretboard();
 
     // Update info
-    var scaleName = window.ScaleDetector.SCALE_LABELS[suggestion.scaleKey] || suggestion.scaleKey;
-    var rootName = window.MusicTheory.pcToName(suggestion.rootPc);
+    var scaleName = window.ScaleDetector.SCALE_LABELS[mapping.scaleKey] || mapping.scaleKey;
+    var rootName = window.MusicTheory.pcToName(mapping.rootPc);
     if (elProgInfo) {
       elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName;
     }
 
-    // Calculate how many notes per chord (one pass of the position)
+    // Calculate how many notes per chord
     var notes = buildMidiNotes();
     practiceState.progressionNotesPerChord = notes.length;
+  }
+
+  // ── Scale editor UI ──
+
+  function toggleScaleEditor() {
+    if (!elProgScaleEditor) return;
+    var visible = elProgScaleEditor.style.display !== 'none';
+    elProgScaleEditor.style.display = visible ? 'none' : '';
+    if (elProgEditorToggle) {
+      elProgEditorToggle.textContent = visible ? '▸ Configurar escalas' : '▾ Configurar escalas';
+    }
+  }
+
+  function renderScaleEditor() {
+    if (!elProgScaleEditor) return;
+    elProgScaleEditor.innerHTML = '';
+
+    var chords = practiceState.progressionChords;
+    var scaleMap = practiceState.progressionScaleMap;
+    var SCALE_LABELS = window.ScaleDetector.SCALE_LABELS;
+    var NOTE_NAMES = window.MusicTheory.NOTE_NAMES;
+
+    // Deduplicate: group consecutive identical chords
+    var groups = [];
+    for (var i = 0; i < chords.length; i++) {
+      groups.push({ chord: chords[i], index: i });
+    }
+
+    groups.forEach(function (g) {
+      var row = document.createElement('div');
+      row.className = 'prog-scale-row';
+
+      // Chord name label
+      var chordLabel = document.createElement('span');
+      chordLabel.className = 'prog-scale-chord';
+      chordLabel.textContent = g.chord;
+      row.appendChild(chordLabel);
+
+      // Arrow
+      var arrow = document.createElement('span');
+      arrow.className = 'prog-scale-arrow';
+      arrow.textContent = '→';
+      row.appendChild(arrow);
+
+      // Scale selector
+      var sel = document.createElement('select');
+      sel.className = 'prog-scale-select';
+      sel.dataset.index = g.index;
+
+      // Get compatible scales for this chord
+      var parsed = window.ChordParser.parseChord(g.chord);
+      var compatScales = [];
+      if (parsed) {
+        compatScales = window.ScaleDetector.findCompatibleScales(parsed.pitchClasses, parsed.rootPc);
+        // Prioritize: same root first, then sorted by label
+        compatScales.sort(function (a, b) {
+          var aRoot = a.root === parsed.rootPc ? 0 : 1;
+          var bRoot = b.root === parsed.rootPc ? 0 : 1;
+          if (aRoot !== bRoot) return aRoot - bRoot;
+          return a.label.localeCompare(b.label);
+        });
+      }
+
+      // Populate options
+      var currentMapping = scaleMap[g.index];
+      compatScales.forEach(function (sc) {
+        var opt = document.createElement('option');
+        opt.value = sc.root + '|' + sc.scaleKey;
+        opt.textContent = sc.label;
+        if (currentMapping && sc.root === currentMapping.rootPc && sc.scaleKey === currentMapping.scaleKey) {
+          opt.selected = true;
+        }
+        sel.appendChild(opt);
+      });
+
+      // If current mapping not in compatible list, add it at top
+      if (currentMapping) {
+        var found = compatScales.some(function (sc) {
+          return sc.root === currentMapping.rootPc && sc.scaleKey === currentMapping.scaleKey;
+        });
+        if (!found) {
+          var label = NOTE_NAMES[currentMapping.rootPc] + ' ' + (SCALE_LABELS[currentMapping.scaleKey] || currentMapping.scaleKey);
+          var opt = document.createElement('option');
+          opt.value = currentMapping.rootPc + '|' + currentMapping.scaleKey;
+          opt.textContent = label;
+          opt.selected = true;
+          sel.insertBefore(opt, sel.firstChild);
+        }
+      }
+
+      sel.addEventListener('change', function () {
+        var parts = sel.value.split('|');
+        var rootPc = parseInt(parts[0]);
+        var scaleKey = parts[1];
+        practiceState.progressionScaleMap[g.index] = { rootPc: rootPc, scaleKey: scaleKey };
+        // Save to localStorage
+        saveScaleMap(practiceState.progressionId, practiceState.progressionScaleMap);
+        // If this is the current chord playing, update live
+        if (practiceState.progressionCurrentIdx === g.index) {
+          applyProgChordScale(g.index);
+        }
+      });
+
+      row.appendChild(sel);
+      elProgScaleEditor.appendChild(row);
+    });
   }
 
   function renderProgStrip() {
