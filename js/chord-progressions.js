@@ -174,8 +174,17 @@
     },
     {
       id: 'alfonsina-y-el-mar', name: 'Alfonsina y el mar', artist: 'Ariel Ramírez',
-      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 80,
-      chords: ['Am','E7','Am','Dm','G7','C','E7','Am'],
+      category: 'Cancionero Argentino', beatsPerChord: 4, defaultBpm: 75,
+      chords: [
+        // Estrofa
+        'Bm7b5','E7','Am','B7','Em',
+        'Am7','D7','Gmaj7','Cmaj7','F#7','B7','Em',
+        'Am7','D7','Gmaj7','Cmaj7','F#7','B7','Em',
+        // Estribillo
+        'Am7','D7','Gmaj7','Bm7b5','E7','A',
+        'B7','Em','B7','F7','E7',
+        'Am','Am6','Em','F#7','B7','Em',
+      ],
     },
     {
       id: 'balada-para-un-loco', name: 'Balada para un loco', artist: 'Piazzolla / Ferrer',
