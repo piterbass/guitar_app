@@ -136,7 +136,8 @@
     document.getElementById('cp-sound').addEventListener('change', function () { state.soundOn = this.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
     if (elArpeggioToggle) {
-      state.arpeggioMode = elArpeggioToggle.checked;  // sync from browser-restored state
+      elArpeggioToggle.checked = false;  // always start with arpeggio off
+      state.arpeggioMode = false;
       elArpeggioToggle.addEventListener('change', function () {
         state.arpeggioMode = elArpeggioToggle.checked;
       });
