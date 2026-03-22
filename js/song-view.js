@@ -273,6 +273,15 @@
     renderQuickChord();
   }
 
+  function playQuickChord() {
+    if (!qcVoicings || qcVoicings.length === 0) return;
+    const v = qcVoicings[qcIndex];
+    const midiNotes = v.frets.map((f, i) =>
+      f === -1 ? null : MT.STANDARD_TUNING[i] + f
+    );
+    window.AudioEngine.playChord(midiNotes);
+  }
+
   function closeQuickChord() {
     document.getElementById('quick-chord-modal').style.display = 'none';
   }
@@ -397,6 +406,7 @@
     document.getElementById('quick-chord-close').addEventListener('click', closeQuickChord);
     document.getElementById('quick-chord-prev').addEventListener('click', () => quickChordNav(-1));
     document.getElementById('quick-chord-next').addEventListener('click', () => quickChordNav(1));
+    document.getElementById('quick-chord-play').addEventListener('click', playQuickChord);
     qcModal.addEventListener('click', (e) => { if (e.target === qcModal) closeQuickChord(); });
     document.addEventListener('keydown', (e) => {
       if (qcModal.style.display !== 'flex') return;

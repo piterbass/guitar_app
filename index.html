@@ -1093,10 +1093,21 @@
       align-items: center;
     }
 
+    .quick-chord-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
     .quick-chord-counter {
       color: #a0a0b0;
       font-size: 0.8rem;
-      margin-top: 4px;
+    }
+
+    .quick-chord-play {
+      padding: 5px 14px !important;
+      font-size: 0.85rem;
     }
 
     #view-lyrics {
@@ -3058,7 +3069,10 @@
         <button class="modal-close" id="quick-chord-close">&times;</button>
       </div>
       <div id="quick-chord-diagram" class="quick-chord-diagram"></div>
-      <div id="quick-chord-counter" class="quick-chord-counter"></div>
+      <div class="quick-chord-footer">
+        <span id="quick-chord-counter" class="quick-chord-counter"></span>
+        <button class="btn-small btn-play quick-chord-play" id="quick-chord-play" title="Reproducir acorde">&#9654; Tocar</button>
+      </div>
     </div>
   </div>
 
