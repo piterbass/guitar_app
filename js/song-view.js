@@ -108,6 +108,11 @@
     fontSize = Math.max(10, Math.min(32, fontSize + delta));
     const container = document.getElementById('view-lyrics');
     container.style.fontSize = fontSize + 'px';
+    // Ajustar padding-top de lyric-lines para que los acordes no se encimen
+    const chordHeight = Math.ceil(fontSize * 0.85) + 4;
+    container.querySelectorAll('.lyric-line').forEach(el => {
+      el.style.paddingTop = chordHeight + 'px';
+    });
   }
 
   function editCurrent() {

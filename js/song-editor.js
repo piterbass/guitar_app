@@ -412,10 +412,45 @@
   }
 
   /**
+   * Convierte cifrado clásico latino (DO, RE, MI...) a americano (C, D, E...).
+   * Reemplaza solo las raíces de acordes, preservando calidad y extensiones.
+   */
+  const LATIN_TO_AMERICAN = {
+    'DOb': 'Cb', 'DO#': 'C#', 'DO': 'C',
+    'REb': 'Db', 'RE#': 'D#', 'RE': 'D',
+    'MIb': 'Eb', 'MI#': 'E#', 'MI': 'E',
+    'FAb': 'Fb', 'FA#': 'F#', 'FA': 'F',
+    'SOLb': 'Gb', 'SOL#': 'G#', 'SOL': 'G',
+    'LAb': 'Ab', 'LA#': 'A#', 'LA': 'A',
+    'SIb': 'Bb', 'SI#': 'B#', 'SI': 'B',
+  };
+
+  function latinToAmerican(texto) {
+    // Case-sensitive: solo matchea mayúsculas (como aparecen en líneas de acordes)
+    // Separa nota de accidental para lookup correcto
+    const rootPattern = /\b(SOL|DO|RE|MI|FA|LA|SI)([#b]?)/g;
+    return texto.replace(rootPattern, (match, note, acc) => {
+      return LATIN_TO_AMERICAN[note + acc] || match;
+    });
+  }
+
+  /** Detecta si el texto usa cifrado clásico latino. */
+  function usesLatinNotation(texto) {
+    const latinRoots = /\b(SOL|DO|RE|MI|FA|LA|SI)[#b]?/g;
+    const matches = texto.match(latinRoots);
+    return matches && matches.length >= 2;
+  }
+
+  /**
    * Convierte texto con acordes sobre la letra (formato LaCuerda.net)
    * al formato [Acorde]letra usado por el cancionero.
    */
   function convertPastedText(texto) {
+    // Auto-detectar y convertir cifrado latino a americano
+    if (usesLatinNotation(texto)) {
+      texto = latinToAmerican(texto);
+    }
+
     const lineas = texto.split('\n');
     const resultado = [];
     let i = 0;
