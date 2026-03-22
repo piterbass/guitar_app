@@ -135,9 +135,12 @@
     elMetronome.addEventListener('change', function () { state.metronomeOn = elMetronome.checked; });
     document.getElementById('cp-sound').addEventListener('change', function () { state.soundOn = this.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
-    if (elArpeggioToggle) elArpeggioToggle.addEventListener('change', function () {
-      state.arpeggioMode = elArpeggioToggle.checked;
-    });
+    if (elArpeggioToggle) {
+      state.arpeggioMode = elArpeggioToggle.checked;  // sync from browser-restored state
+      elArpeggioToggle.addEventListener('change', function () {
+        state.arpeggioMode = elArpeggioToggle.checked;
+      });
+    }
 
     // Tap diagram to pick voicing (when not playing)
     elDiagram.addEventListener('click', function () {

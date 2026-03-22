@@ -127,7 +127,7 @@
             cx: bx, cy: barreY, r: CFG.dotRadius,
             fill: 'transparent', 'pointer-events': 'none',
             'data-string': bs, 'data-midi': STANDARD_TUNING[bs] + b.fret,
-            class: 'chord-dot'
+            'data-type': 'chord-dot'
           }));
         }
       }
@@ -174,7 +174,7 @@
             cx: x, cy: y, r: CFG.dotRadius,
             fill: '#333', 'pointer-events': 'none',
             'data-string': s, 'data-midi': STANDARD_TUNING[s] + fret,
-            class: 'chord-dot'
+            'data-type': 'chord-dot'
           });
           svg.appendChild(dot);
         }
@@ -400,7 +400,7 @@
    */
   function highlightString(svg, stringIndex) {
     if (!svg) return;
-    var dot = svg.querySelector('.chord-dot[data-string="' + stringIndex + '"]');
+    var dot = svg.querySelector('[data-string="' + stringIndex + '"][data-midi]');
     if (!dot) return;
     dot.setAttribute('data-orig-fill', dot.getAttribute('fill') || '');
     dot.setAttribute('data-orig-stroke', dot.getAttribute('stroke') || '');
@@ -418,7 +418,7 @@
    */
   function clearDiagramHighlights(svg) {
     if (!svg) return;
-    var dots = svg.querySelectorAll('.chord-dot[data-orig-fill]');
+    var dots = svg.querySelectorAll('[data-string][data-orig-fill]');
     dots.forEach(function (dot) {
       var origFill = dot.getAttribute('data-orig-fill');
       dot.setAttribute('fill', origFill);
