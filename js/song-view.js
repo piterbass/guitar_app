@@ -15,9 +15,10 @@
   // ── Auto-scroll state ──────────────────────────────────────
   let scrollInterval = null;
   let scrollSpeed = 0;         // 0 = paused
-  const SCROLL_SPEEDS = [0, 1, 2, 3, 5, 8]; // px per tick
+  let scrollAccum = 0;         // acumulador sub-pixel
+  const SCROLL_SPEEDS = [0, 0.4, 0.8, 1.2, 2, 3]; // px per tick
   const SCROLL_LABELS = ['Off', '1', '2', '3', '4', '5'];
-  const SCROLL_TICK = 50;      // ms between ticks
+  const SCROLL_TICK = 80;      // ms between ticks
 
   // ── Transpose state ────────────────────────────────────────
   let transposeSemitones = 0;
@@ -141,10 +142,16 @@
 
     if (speedIdx === 0) return;
 
-    const px = SCROLL_SPEEDS[speedIdx];
+    const pxPerTick = SCROLL_SPEEDS[speedIdx];
     const lyrics = document.getElementById('view-lyrics');
+    scrollAccum = 0;
     scrollInterval = setInterval(() => {
-      lyrics.scrollTop += px;
+      scrollAccum += pxPerTick;
+      if (scrollAccum >= 1) {
+        const whole = Math.floor(scrollAccum);
+        lyrics.scrollTop += whole;
+        scrollAccum -= whole;
+      }
     }, SCROLL_TICK);
   }
 
