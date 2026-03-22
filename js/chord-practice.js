@@ -443,18 +443,31 @@
         Audio.playClick(isFirstBeat);
       }
 
-      // On first beat: update diagram first, then play chord/arpeggio
+      // On first beat: update diagram, play chord or start arpeggio cycle
       if (isFirstBeat) {
         renderCurrentChord();
         var voicing = state.voicings[state.currentChordIndex];
         if (voicing && state.soundOn) {
-          var chordDuration = Math.max((curBeats * intervalMs) / 1000, 1.5);
           if (state.arpeggioMode) {
-            playArpeggio(voicing, chordDuration);
+            // Arpeggio: patrón base de max 4 beats, se repite si hay más
+            var patternBeats = Math.min(curBeats, 4);
+            var patternDuration = (patternBeats * intervalMs) / 1000;
+            playArpeggio(voicing, patternDuration, patternBeats);
           } else {
+            var chordDuration = Math.max((curBeats * intervalMs) / 1000, 1.5);
             var midi = voicingToMidi(voicing);
             Audio.playChord(midi, chordDuration);
           }
+        }
+      }
+
+      // Arpeggio: repetir patrón cada 4 beats
+      if (state.arpeggioMode && !isFirstBeat && state.beatInChord > 0 && state.beatInChord % 4 === 0) {
+        var voicingRepeat = state.voicings[state.currentChordIndex];
+        if (voicingRepeat && state.soundOn) {
+          var remainBeats = Math.min(curBeats - state.beatInChord, 4);
+          var remainDuration = (remainBeats * intervalMs) / 1000;
+          playArpeggio(voicingRepeat, remainDuration, remainBeats);
         }
       }
 
@@ -809,36 +822,49 @@
 
   // ── Arpeggio playback ──
 
-  function playArpeggio(voicing, totalDurationSec) {
+  /**
+   * Toca arpegio con patrón rítmico fijo.
+   * patternBeats = cuántos beats dura este patrón (max 4).
+   * Si hay menos beats que notas, se tocan menos notas.
+   * El patrón es: una nota por beat, bajo → agudo.
+   */
+  function playArpeggio(voicing, patternDurationSec, patternBeats) {
     if (!voicing || !voicing.frets) return;
 
-    // Build note list with string index (low to high, skip muted)
-    var notes = [];
+    // Build note list (low to high, skip muted)
+    var allNotes = [];
     for (var s = 0; s < voicing.frets.length; s++) {
       var f = voicing.frets[s];
       if (f !== -1) {
-        notes.push({ midi: STANDARD_TUNING[s] + f, string: s });
+        allNotes.push({ midi: STANDARD_TUNING[s] + f, string: s });
       }
     }
-    if (notes.length === 0) return;
+    if (allNotes.length === 0) return;
 
     // Clear any previous arpeggio
     clearArpeggioTimeouts();
 
-    // Space notes evenly across the beat duration
-    var noteInterval = (totalDurationSec * 1000) / (notes.length + 1);
-    var noteDuration = Math.max(totalDurationSec * 0.8, 1.0);
+    // Build arpeggio pattern: one note per beat, cycling through available notes
+    // For 4 beats with 5 notes: play first 4
+    // For 4 beats with 3 notes: play 3 notes + root again
+    // For 2 beats: play first 2 notes (bass + next)
+    var pattern = [];
+    for (var b = 0; b < patternBeats; b++) {
+      pattern.push(allNotes[b % allNotes.length]);
+    }
 
-    notes.forEach(function (note, idx) {
+    var beatMs = (patternDurationSec * 1000) / patternBeats;
+    var noteDuration = Math.max(beatMs / 1000 * 1.5, 0.8);
+
+    pattern.forEach(function (note, idx) {
       var tid = setTimeout(function () {
-        // Find SVG fresh each time (it may have been re-rendered)
         var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
         if (svg) {
           Diagram.clearDiagramHighlights(svg);
           Diagram.highlightString(svg, note.string);
         }
         Audio.playNote(note.midi, noteDuration);
-      }, idx * noteInterval);
+      }, idx * beatMs);
       state._arpeggioTimeouts.push(tid);
     });
 
@@ -846,7 +872,7 @@
     var clearTid = setTimeout(function () {
       var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
       if (svg) Diagram.clearDiagramHighlights(svg);
-    }, notes.length * noteInterval);
+    }, pattern.length * beatMs);
     state._arpeggioTimeouts.push(clearTid);
   }
 
