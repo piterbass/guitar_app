@@ -36,6 +36,7 @@
   let elAdvancedToggle, elAdvancedPanel;
   let elZoneEnabled, elZoneControls, elZoneFretMin, elZoneFretMax, elZoneStringMin, elZoneStringMax;
   let elStringMode, elStringPairInfo;
+  let elPathUp, elPathDown, elPathDownRow, elPathInfo;
   let elTransposeAll, elTransposeInfo;
 
   // ── State ──
@@ -74,6 +75,8 @@
     zoneStringMax: 3,    // 3 = 3ª cuerda (G)
     stringMode: 'all',   // 'all' | 'pairs' | 'skip'
     _stringPairIndex: 0, // current pair/skip group index
+    pathUp: 'melodico',    // 'melodico' | 'cuerdas' | 'diagonal'
+    pathDown: 'cuerdas',   // 'melodico' | 'cuerdas' | 'diagonal'
     transposeAllKeys: false,
     _transposeSemitones: 0,  // current transposition offset (0-11)
     _transposeOriginalRootPc: null,
@@ -119,6 +122,10 @@
     elZoneStringMax    = document.getElementById('practice-zone-string-max');
     elStringMode       = document.getElementById('practice-string-mode');
     elStringPairInfo   = document.getElementById('practice-string-pair-info');
+    elPathUp           = document.getElementById('practice-path-up');
+    elPathDown         = document.getElementById('practice-path-down');
+    elPathDownRow      = document.getElementById('practice-path-down-row');
+    elPathInfo         = document.getElementById('practice-path-info');
     elTransposeAll     = document.getElementById('practice-transpose-all');
     elTransposeInfo    = document.getElementById('practice-transpose-info');
 
@@ -142,6 +149,8 @@
     elPositionSelect.addEventListener('change', onPositionChanged);
     elDirection.addEventListener('change', () => {
       practiceState.direction = elDirection.value;
+      updatePathDownVisibility();
+      updatePathInfo();
       if (practiceState.playing) { stop(); }
     });
     elSpeed.addEventListener('change', onSpeedChanged);
@@ -190,6 +199,16 @@
       updateStringModeInfo();
       if (practiceState.playing) { stop(); }
     });
+    if (elPathUp) elPathUp.addEventListener('change', function () {
+      practiceState.pathUp = this.value;
+      updatePathInfo();
+      if (practiceState.playing) { stop(); }
+    });
+    if (elPathDown) elPathDown.addEventListener('change', function () {
+      practiceState.pathDown = this.value;
+      updatePathInfo();
+      if (practiceState.playing) { stop(); }
+    });
     if (elTransposeAll) elTransposeAll.addEventListener('change', function () {
       practiceState.transposeAllKeys = this.checked;
       elTransposeInfo.style.display = this.checked ? '' : 'none';
@@ -200,6 +219,7 @@
     });
 
     // Initial
+    updatePathDownVisibility();
     onScaleChanged();
   }
 
@@ -1012,6 +1032,91 @@
     return notes.filter(function (n) { return stringSet[n.string]; });
   }
 
+  // ── Path sorting algorithms ──
+
+  /**
+   * Melódico: notas ordenadas estrictamente por altura (MIDI).
+   * Sin repeticiones de pitch, recorrido limpio ascendente.
+   */
+  function sortMelodico(notes) {
+    var sorted = [...notes].sort(function (a, b) { return a.midi - b.midi; });
+    // Dedup by midi to avoid repeated pitches on different strings
+    var seen = {};
+    return sorted.filter(function (n) {
+      if (seen[n.midi]) return false;
+      seen[n.midi] = true;
+      return true;
+    });
+  }
+
+  /**
+   * Por cuerdas: toca cada cuerda completa (notas ascendentes por traste),
+   * avanzando de la cuerda más grave a la más aguda.
+   */
+  function sortPorCuerdas(notes) {
+    return [...notes].sort(function (a, b) {
+      if (a.string !== b.string) return a.string - b.string;
+      return a.fret - b.fret;
+    });
+  }
+
+  /**
+   * Diagonal: recorre las cuerdas tomando una nota de cada una en orden,
+   * creando un movimiento cruzado por el diapasón.
+   * Agrupa por cuerda, luego intercala: 1ª nota de cada cuerda, 2ª de cada, etc.
+   */
+  function sortDiagonal(notes) {
+    // Group notes by string, sorted by fret within each string
+    var byString = {};
+    notes.forEach(function (n) {
+      if (!byString[n.string]) byString[n.string] = [];
+      byString[n.string].push(n);
+    });
+    var strings = Object.keys(byString).map(Number).sort(function (a, b) { return a - b; });
+    strings.forEach(function (s) {
+      byString[s].sort(function (a, b) { return a.fret - b.fret; });
+    });
+
+    // Interleave: take one note from each string in round-robin
+    var result = [];
+    var maxLen = 0;
+    strings.forEach(function (s) {
+      if (byString[s].length > maxLen) maxLen = byString[s].length;
+    });
+    for (var i = 0; i < maxLen; i++) {
+      for (var si = 0; si < strings.length; si++) {
+        var arr = byString[strings[si]];
+        if (i < arr.length) result.push(arr[i]);
+      }
+    }
+    return result;
+  }
+
+  function applyPath(notes, pathType) {
+    if (pathType === 'melodico') return sortMelodico(notes);
+    if (pathType === 'cuerdas') return sortPorCuerdas(notes);
+    if (pathType === 'diagonal') return sortDiagonal(notes);
+    return sortMelodico(notes); // fallback
+  }
+
+  function updatePathDownVisibility() {
+    if (!elPathDownRow) return;
+    var show = elDirection && elDirection.value === 'both';
+    elPathDownRow.style.display = show ? '' : 'none';
+  }
+
+  function updatePathInfo() {
+    if (!elPathInfo) return;
+    var dir = practiceState.direction;
+    var LABELS = { melodico: 'Melódico', cuerdas: 'Por cuerdas', diagonal: 'Diagonal' };
+    if (dir === 'both') {
+      elPathInfo.style.display = '';
+      elPathInfo.textContent = 'Sube: ' + LABELS[practiceState.pathUp] + '  ·  Baja: ' + LABELS[practiceState.pathDown];
+    } else {
+      elPathInfo.style.display = 'none';
+    }
+  }
+
   // ── Build notes for playback ──
 
   function buildMidiNotes() {
@@ -1035,22 +1140,28 @@
       }
     }
 
-    // Sort: string ascending (grave to agudo), then fret ascending
-    notes.sort(function (a, b) {
-      if (a.string !== b.string) return a.string - b.string;
-      return a.fret - b.fret;
-    });
+    if (notes.length === 0) return [];
 
-    const midiNotes = notes.map(function (n) { return n.midi; });
+    // Apply path sorting
+    var pathUp = practiceState.pathUp;
+    var pathDown = practiceState.pathDown;
 
+    if (practiceState.direction === 'ascending') {
+      return applyPath(notes, pathUp).map(function (n) { return n.midi; });
+    }
     if (practiceState.direction === 'descending') {
-      return midiNotes.reverse();
+      return applyPath(notes, pathUp).reverse().map(function (n) { return n.midi; });
     }
     if (practiceState.direction === 'both') {
-      const desc = [...midiNotes].reverse().slice(1);
-      return [...midiNotes, ...desc];
+      // Ascending by pathUp, descending by pathDown (different route!)
+      var ascNotes = applyPath(notes, pathUp).map(function (n) { return n.midi; });
+      var descNotes = applyPath(notes, pathDown).reverse().map(function (n) { return n.midi; });
+      // Remove first note of descending to avoid repeating the top note
+      if (descNotes.length > 0) descNotes = descNotes.slice(1);
+      return ascNotes.concat(descNotes);
     }
-    return midiNotes;
+
+    return applyPath(notes, pathUp).map(function (n) { return n.midi; });
   }
 
   // ── Play / Stop ──

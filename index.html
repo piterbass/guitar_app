@@ -3116,6 +3116,25 @@
               <div id="practice-string-pair-info" class="string-mode-info" style="display:none;"></div>
             </div>
 
+            <!-- Caminos de recorrido -->
+            <div class="practice-zone-box">
+              <label>Camino de subida</label>
+              <select id="practice-path-up">
+                <option value="melodico">Melódico (por altura)</option>
+                <option value="cuerdas">Por cuerdas (cuerda a cuerda)</option>
+                <option value="diagonal">Diagonal (cruzado)</option>
+              </select>
+              <div id="practice-path-down-row">
+                <label style="margin-top:6px;">Camino de bajada</label>
+                <select id="practice-path-down">
+                  <option value="melodico">Melódico (por altura)</option>
+                  <option value="cuerdas" selected>Por cuerdas (cuerda a cuerda)</option>
+                  <option value="diagonal">Diagonal (cruzado)</option>
+                </select>
+              </div>
+              <div id="practice-path-info" class="string-mode-info" style="display:none;"></div>
+            </div>
+
             <!-- Transponer por todos los tonos -->
             <div class="practice-zone-box">
               <label class="toggle-label">
