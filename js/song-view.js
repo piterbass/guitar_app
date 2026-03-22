@@ -134,10 +134,7 @@
     fontSize = Math.max(10, Math.min(32, fontSize + delta));
     const container = document.getElementById('view-lyrics');
     container.style.fontSize = fontSize + 'px';
-    const chordHeight = Math.ceil(fontSize * 0.85) + 4;
-    container.querySelectorAll('.lyric-line').forEach(el => {
-      el.style.paddingTop = chordHeight + 'px';
-    });
+    // padding-top en em escala automáticamente con el font-size
   }
 
   // ── Auto-scroll ────────────────────────────────────────────
