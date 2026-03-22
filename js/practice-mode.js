@@ -891,18 +891,20 @@
 
   function renderFretboard() {
     elFretboard.innerHTML = '';
-    const pos = practiceState.positions[practiceState.selectedPosition];
-    if (!pos) return;
 
-    // If zone mode, filter position notes to show only zone notes
-    var displayNotes = pos.noteData;
-    var displayFretRange = pos.fretRange;
+    var displayNotes, displayFretRange;
 
     if (practiceState.zoneEnabled) {
-      displayNotes = filterNotesByZone(pos.noteData);
+      // Zone mode: generate all scale notes in the zone, independent of position
+      displayNotes = buildZoneNotes();
       var fMin = Math.min(practiceState.zoneFretMin, practiceState.zoneFretMax);
       var fMax = Math.max(practiceState.zoneFretMin, practiceState.zoneFretMax);
       displayFretRange = [fMin, fMax];
+    } else {
+      const pos = practiceState.positions[practiceState.selectedPosition];
+      if (!pos) return;
+      displayNotes = pos.noteData;
+      displayFretRange = pos.fretRange;
     }
 
     // If string pair/skip mode, further filter to show active group
@@ -974,22 +976,33 @@
     return groups;
   }
 
-  // ── Filter notes by zone and string group ──
+  // ── Generate all scale notes within a fret/string zone ──
 
-  function filterNotesByZone(noteData) {
-    var notes = noteData;
+  function buildZoneNotes() {
+    var fMin = Math.min(practiceState.zoneFretMin, practiceState.zoneFretMax);
+    var fMax = Math.max(practiceState.zoneFretMin, practiceState.zoneFretMax);
+    var sMin = Math.min(practiceState.zoneStringMin, practiceState.zoneStringMax);
+    var sMax = Math.max(practiceState.zoneStringMin, practiceState.zoneStringMax);
+    var scalePCSet = {};
+    practiceState.scalePCs.forEach(function (pc) { scalePCSet[pc] = true; });
 
-    if (practiceState.zoneEnabled) {
-      var fMin = Math.min(practiceState.zoneFretMin, practiceState.zoneFretMax);
-      var fMax = Math.max(practiceState.zoneFretMin, practiceState.zoneFretMax);
-      var sMin = Math.min(practiceState.zoneStringMin, practiceState.zoneStringMax);
-      var sMax = Math.max(practiceState.zoneStringMin, practiceState.zoneStringMax);
-
-      notes = notes.filter(function (n) {
-        return n.fret >= fMin && n.fret <= fMax && n.string >= sMin && n.string <= sMax;
-      });
+    var formula = window.MusicTheory.SCALE_FORMULAS[practiceState.scaleKey];
+    var notes = [];
+    for (var s = sMin; s <= sMax; s++) {
+      for (var f = fMin; f <= fMax; f++) {
+        var pc = fretToPC(s, f);
+        if (scalePCSet[pc]) {
+          var midi = STANDARD_TUNING[s] + f;
+          var degree = practiceState.scalePCs.indexOf(pc);
+          notes.push({
+            string: s, fret: f, midi: midi, pc: pc,
+            interval: formula && degree >= 0 ? formula[degree] : '',
+            isRoot: pc === practiceState.rootPc,
+            isTriad: degree !== -1 && degree % 2 === 0,
+          });
+        }
+      }
     }
-
     return notes;
   }
 
@@ -1002,14 +1015,16 @@
   // ── Build notes for playback ──
 
   function buildMidiNotes() {
-    const pos = practiceState.positions[practiceState.selectedPosition];
-    if (!pos) return [];
+    var notes;
 
-    // Start with full position notes
-    var notes = [...pos.noteData];
-
-    // Apply zone filtering
-    notes = filterNotesByZone(notes);
+    if (practiceState.zoneEnabled) {
+      // Zone mode: generate notes from the full scale within the zone, ignoring position
+      notes = buildZoneNotes();
+    } else {
+      const pos = practiceState.positions[practiceState.selectedPosition];
+      if (!pos) return [];
+      notes = [...pos.noteData];
+    }
 
     // Apply string group filtering (pairs/skip mode)
     if (practiceState.stringMode !== 'all') {
