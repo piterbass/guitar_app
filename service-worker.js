@@ -2,7 +2,7 @@
 // service-worker.js  –  Cache offline para Guitar App PWA
 // ============================================================
 
-const CACHE_NAME = 'guitar-app-v29';
+const CACHE_NAME = 'guitar-app-v44';
 
 const ASSETS = [
   './',
@@ -17,6 +17,7 @@ const ASSETS = [
   './js/harmonic-context.js',
   './js/chord-bank.js',
   './js/scale-bank.js',
+  './js/custom-scales.js',
   './js/songbook.js',
   './js/song-editor.js',
   './js/song-view.js',
@@ -24,9 +25,14 @@ const ASSETS = [
   './js/scale-position-engine.js',
   './js/full-fretboard-svg.js',
   './js/scales-ui.js',
+  './js/custom-scale-builder.js',
+  './js/practice-mode.js',
+  './js/chord-progressions.js',
+  './js/chord-practice.js',
   './js/chord-identifier.js',
   './js/chord-analyzer-ui.js',
   './js/ui.js',
+  './js/backup.js',
   './public/header.jpg',
   './public/Magic_Brain_Transparent_4.png',
 ];
@@ -51,23 +57,25 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: servir desde cache, fallback a red
+// Fetch: network-first, fallback a cache (evita servir versiones viejas)
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        // Cachear nuevos requests dinámicamente
-        if (response.ok && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    }).catch(() => {
-      // Offline fallback
-      if (event.request.destination === 'document') {
-        return caches.match('./index.html');
+    fetch(event.request).then((response) => {
+      // Actualizar cache con la respuesta fresca
+      if (response.ok && event.request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
       }
+      return response;
+    }).catch(() => {
+      // Sin red → servir desde cache (modo offline)
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        // Offline fallback para navegación
+        if (event.request.destination === 'document') {
+          return caches.match('./index.html');
+        }
+      });
     })
   );
 });
