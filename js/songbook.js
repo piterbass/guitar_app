@@ -69,7 +69,12 @@
   /** Extrae nombres de acordes únicos del contenido de una canción. */
   function extractChords(content) {
     const matches = content.match(/\[([^\]]+)\]/g) || [];
-    const chords = matches.map(m => m.slice(1, -1));
+    const chords = matches.map(m => {
+      const raw = m.slice(1, -1).trim();
+      // Strip optional :N beat notation
+      const beatMatch = raw.match(/^(.+):(\d+)$/);
+      return beatMatch ? beatMatch[1].trim() : raw;
+    });
     return [...new Set(chords)];
   }
 

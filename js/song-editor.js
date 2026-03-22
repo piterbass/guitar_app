@@ -88,7 +88,11 @@
           lineHtml += `<span class="lyric-text">${escapeHtml(textBefore)}</span>`;
         }
 
-        const chordName = match[1].trim();
+        const chordRaw = match[1].trim();
+        // Strip optional :N beat notation for display
+        const beatMatch = chordRaw.match(/^(.+):(\d+)$/);
+        const chordName = beatMatch ? beatMatch[1].trim() : chordRaw;
+        const beatsSuffix = beatMatch ? `:${beatMatch[2]}` : '';
         const clickAttr = editorMode
           ? `onclick="SongEditor.onChordClick('${escapeAttr(chordName)}')" class="chord-marker clickable"`
           : `data-chord="${escapeAttr(chordName)}" class="chord-marker"`;

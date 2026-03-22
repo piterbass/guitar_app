@@ -308,9 +308,14 @@
    * Preserva la calidad del acorde y la notación (sostenidos/bemoles).
    */
   function transposeContent(content, semitones) {
-    // Reemplazar cada [Acorde] con el acorde transpuesto
+    // Reemplazar cada [Acorde] o [Acorde:N] con el acorde transpuesto
     return content.replace(/\[([^\]]+)\]/g, (match, chordStr) => {
-      return '[' + transposeChordName(chordStr.trim(), semitones) + ']';
+      const raw = chordStr.trim();
+      // Preserve optional :N beat notation
+      const beatMatch = raw.match(/^(.+):(\d+)$/);
+      const chordPart = beatMatch ? beatMatch[1].trim() : raw;
+      const beatsSuffix = beatMatch ? ':' + beatMatch[2] : '';
+      return '[' + transposeChordName(chordPart, semitones) + beatsSuffix + ']';
     });
   }
 

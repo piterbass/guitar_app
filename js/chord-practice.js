@@ -41,7 +41,9 @@
     positionZone: 'all',
     chords: [],
     voicings: [],
-    songSegments: [],   // [{chord, lyrics}] - karaoke segments from song content
+    songSegments: [],   // [{chord, lyrics, beats}] - karaoke segments from song content
+    beatsPerChordArr: [],  // per-chord beats (from :N notation), null = use global
+    hasCustomBeats: false, // true if any chord has :N notation
     isSong: false,      // true when a songbook song is selected
     customVoicings: {}, // { progId: { chordIdx: voicingObj } } - user overrides saved in localStorage
     arpeggioMode: false,
@@ -223,10 +225,20 @@
         state.isSong = true;
         state.beatsPerChord = 4;
         state.selectedId = id;
+
+        // Build per-chord beats array from segments
+        var anyCustom = false;
+        state.beatsPerChordArr = state.songSegments.map(function (seg) {
+          if (seg.beats) { anyCustom = true; return seg.beats; }
+          return null;
+        });
+        state.hasCustomBeats = anyCustom;
       } else {
         state.chords = [];
         state.songSegments = [];
         state.isSong = false;
+        state.hasCustomBeats = false;
+        state.beatsPerChordArr = [];
       }
     } else {
       var list = Progressions.getByCategory(state.category);
@@ -377,6 +389,14 @@
       .filter(function (n) { return n !== null; });
   }
 
+  /** Returns beats for the given chord index (per-chord or global fallback). */
+  function getBeatsForChord(idx) {
+    if (state.hasCustomBeats && state.beatsPerChordArr[idx]) {
+      return state.beatsPerChordArr[idx];
+    }
+    return state.beatsPerChord;
+  }
+
   // ── Play / Stop (same metronome pattern as practice-mode.js) ──
 
   function play() {
@@ -401,7 +421,7 @@
     renderCurrentChord();
 
     var intervalMs = 60000 / state.bpm;
-    var countIn = state.beatsPerChord;
+    var countIn = getBeatsForChord(state.currentChordIndex);
 
     state._intervalId = setInterval(function () {
       // Count-in phase
@@ -415,6 +435,7 @@
       }
 
       // Playing phase
+      var curBeats = getBeatsForChord(state.currentChordIndex);
       var isFirstBeat = (state.beatInChord === 0);
 
       // Metronome click
@@ -427,7 +448,7 @@
         renderCurrentChord();
         var voicing = state.voicings[state.currentChordIndex];
         if (voicing && state.soundOn) {
-          var chordDuration = Math.max((state.beatsPerChord * intervalMs) / 1000, 1.5);
+          var chordDuration = Math.max((curBeats * intervalMs) / 1000, 1.5);
           if (state.arpeggioMode) {
             playArpeggio(voicing, chordDuration);
           } else {
@@ -438,11 +459,11 @@
       }
 
       // Beat indicator
-      updateBeatIndicator(state.beatInChord, state.beatsPerChord, false);
+      updateBeatIndicator(state.beatInChord, curBeats, false);
 
       // Advance beat
       state.beatInChord++;
-      if (state.beatInChord >= state.beatsPerChord) {
+      if (state.beatInChord >= curBeats) {
         state.beatInChord = 0;
         state.currentChordIndex++;
 
@@ -578,8 +599,9 @@
   }
 
   /**
-   * Parse song content into segments: [{chord, lyrics}, ...]
+   * Parse song content into segments: [{chord, lyrics, beats}, ...]
    * Each segment is one chord occurrence with its associated lyrics text.
+   * Supports optional beat notation: [Dm7:2] means 2 beats for this chord.
    */
   function parseSongSegments(content) {
     if (!content) return [];
@@ -587,9 +609,15 @@
     var parts = content.split(/\[([^\]]+)\]/);
     // parts = [textBefore, chord1, textAfter1, chord2, textAfter2, ...]
     for (var i = 1; i < parts.length; i += 2) {
-      var chord = parts[i].trim();
+      var raw = parts[i].trim();
       var lyrics = (parts[i + 1] || '').replace(/\n+/g, ' ').trim();
-      segments.push({ chord: chord, lyrics: lyrics });
+      // Parse optional :N beat notation
+      var beatMatch = raw.match(/^(.+):(\d+)$/);
+      if (beatMatch) {
+        segments.push({ chord: beatMatch[1].trim(), beats: parseInt(beatMatch[2]), lyrics: lyrics });
+      } else {
+        segments.push({ chord: raw, beats: null, lyrics: lyrics });
+      }
     }
     return segments;
   }
