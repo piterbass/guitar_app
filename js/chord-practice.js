@@ -31,7 +31,7 @@
   let elPlay, elPause, elStop, elBeatIndicator;
   let elPositionZone;
   let elLyricsKaraoke, elKaraokeCurrent, elKaraokeNext;
-  let elArpeggioToggle;
+  let elArpeggioToggle, elArpOpts, elArpSubdivision, elArpDirection;
 
   // ── State ──
   let state = {
@@ -47,6 +47,8 @@
     isSong: false,      // true when a songbook song is selected
     customVoicings: {}, // { progId: { chordIdx: voicingObj } } - user overrides saved in localStorage
     arpeggioMode: false,
+    arpSubdivision: 1,    // 1=negra, 2=corchea, 4=semicorchea (notes per beat)
+    arpDirection: 'asc',  // 'asc', 'desc', 'both'
     beatsPerChord: 4,
     currentChordIndex: 0,
     beatInChord: 0,
@@ -89,6 +91,9 @@
     elKaraokeCurrent = document.getElementById('cp-karaoke-current');
     elKaraokeNext   = document.getElementById('cp-karaoke-next');
     elArpeggioToggle = document.getElementById('cp-arpeggio');
+    elArpOpts        = document.getElementById('cp-arpeggio-opts');
+    elArpSubdivision = document.getElementById('cp-arp-subdivision');
+    elArpDirection   = document.getElementById('cp-arp-direction');
 
     if (!elCategory || !elProgression) return;
 
@@ -138,10 +143,21 @@
     document.getElementById('cp-sound').addEventListener('change', function () { state.soundOn = this.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
     if (elArpeggioToggle) {
-      elArpeggioToggle.checked = false;  // always start with arpeggio off
+      elArpeggioToggle.checked = false;
       state.arpeggioMode = false;
       elArpeggioToggle.addEventListener('change', function () {
         state.arpeggioMode = elArpeggioToggle.checked;
+        if (elArpOpts) elArpOpts.style.display = state.arpeggioMode ? 'flex' : 'none';
+      });
+    }
+    if (elArpSubdivision) {
+      elArpSubdivision.addEventListener('change', function () {
+        state.arpSubdivision = parseInt(elArpSubdivision.value) || 1;
+      });
+    }
+    if (elArpDirection) {
+      elArpDirection.addEventListener('change', function () {
+        state.arpDirection = elArpDirection.value;
       });
     }
 
@@ -823,10 +839,25 @@
   // ── Arpeggio playback ──
 
   /**
-   * Toca arpegio con patrón rítmico fijo.
-   * patternBeats = cuántos beats dura este patrón (max 4).
-   * Si hay menos beats que notas, se tocan menos notas.
-   * El patrón es: una nota por beat, bajo → agudo.
+   * Construye la secuencia de notas según dirección.
+   * asc: bajo→agudo, desc: agudo→bajo, both: bajo→agudo→bajo (sin repetir extremos)
+   */
+  function buildArpSequence(allNotes, direction) {
+    if (direction === 'desc') return allNotes.slice().reverse();
+    if (direction === 'both') {
+      if (allNotes.length <= 2) return allNotes.slice();
+      var up = allNotes.slice();
+      var down = allNotes.slice().reverse().slice(1, -1); // sin repetir extremos
+      return up.concat(down);
+    }
+    return allNotes.slice(); // asc
+  }
+
+  /**
+   * Toca arpegio con subdivisión y dirección configurables.
+   * patternBeats = cuántos beats dura este ciclo (max 4).
+   * subdivision = notas por beat (1=negra, 2=corchea, 4=semicorchea).
+   * direction = 'asc', 'desc', 'both'.
    */
   function playArpeggio(voicing, patternDurationSec, patternBeats) {
     if (!voicing || !voicing.frets) return;
@@ -841,20 +872,25 @@
     }
     if (allNotes.length === 0) return;
 
-    // Clear any previous arpeggio
     clearArpeggioTimeouts();
 
-    // Build arpeggio pattern: one note per beat, cycling through available notes
-    // For 4 beats with 5 notes: play first 4
-    // For 4 beats with 3 notes: play 3 notes + root again
-    // For 2 beats: play first 2 notes (bass + next)
+    var sub = state.arpSubdivision || 1;
+    var dir = state.arpDirection || 'asc';
+
+    // Total note slots available in this pattern
+    var totalSlots = patternBeats * sub;
+
+    // Build the base sequence for the chosen direction
+    var baseSeq = buildArpSequence(allNotes, dir);
+
+    // Fill slots by cycling through the sequence
     var pattern = [];
-    for (var b = 0; b < patternBeats; b++) {
-      pattern.push(allNotes[b % allNotes.length]);
+    for (var i = 0; i < totalSlots; i++) {
+      pattern.push(baseSeq[i % baseSeq.length]);
     }
 
-    var beatMs = (patternDurationSec * 1000) / patternBeats;
-    var noteDuration = Math.max(beatMs / 1000 * 1.5, 0.8);
+    var slotMs = (patternDurationSec * 1000) / totalSlots;
+    var noteDuration = Math.max(slotMs / 1000 * 2, 0.5);
 
     pattern.forEach(function (note, idx) {
       var tid = setTimeout(function () {
@@ -864,7 +900,7 @@
           Diagram.highlightString(svg, note.string);
         }
         Audio.playNote(note.midi, noteDuration);
-      }, idx * beatMs);
+      }, idx * slotMs);
       state._arpeggioTimeouts.push(tid);
     });
 
@@ -872,7 +908,7 @@
     var clearTid = setTimeout(function () {
       var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
       if (svg) Diagram.clearDiagramHighlights(svg);
-    }, pattern.length * beatMs);
+    }, pattern.length * slotMs);
     state._arpeggioTimeouts.push(clearTid);
   }
 
