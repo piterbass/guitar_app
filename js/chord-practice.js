@@ -30,6 +30,8 @@
   let elMetronome, elLoop;
   let elPlay, elPause, elStop, elBeatIndicator;
   let elPositionZone;
+  let elLyricsKaraoke, elKaraokeCurrent, elKaraokeNext;
+  let elArpeggioToggle;
 
   // ── State ──
   let state = {
@@ -39,6 +41,10 @@
     positionZone: 'all',
     chords: [],
     voicings: [],
+    songSegments: [],   // [{chord, lyrics}] - karaoke segments from song content
+    isSong: false,      // true when a songbook song is selected
+    customVoicings: {}, // { progId: { chordIdx: voicingObj } } - user overrides saved in localStorage
+    arpeggioMode: false,
     beatsPerChord: 4,
     currentChordIndex: 0,
     beatInChord: 0,
@@ -51,6 +57,7 @@
     paused: false,
     _intervalId: null,
     _countIdx: 0,
+    _arpeggioTimeouts: [],
   };
 
   // ── Init ──
@@ -76,6 +83,10 @@
     elStop          = document.getElementById('cp-stop');
     elBeatIndicator = document.getElementById('cp-beat-indicator');
     elPositionZone  = document.getElementById('cp-position-zone');
+    elLyricsKaraoke = document.getElementById('cp-lyrics-karaoke');
+    elKaraokeCurrent = document.getElementById('cp-karaoke-current');
+    elKaraokeNext   = document.getElementById('cp-karaoke-next');
+    elArpeggioToggle = document.getElementById('cp-arpeggio');
 
     if (!elCategory || !elProgression) return;
 
@@ -124,11 +135,24 @@
     elMetronome.addEventListener('change', function () { state.metronomeOn = elMetronome.checked; });
     document.getElementById('cp-sound').addEventListener('change', function () { state.soundOn = this.checked; });
     elLoop.addEventListener('change', function () { state.loopOn = elLoop.checked; });
+    if (elArpeggioToggle) elArpeggioToggle.addEventListener('change', function () {
+      state.arpeggioMode = elArpeggioToggle.checked;
+    });
+
+    // Tap diagram to pick voicing (when not playing)
+    elDiagram.addEventListener('click', function () {
+      if (state.playing) return;
+      if (state.chords.length === 0) return;
+      openVoicingPicker(state.currentChordIndex);
+    });
 
     // Play / Pause / Stop
     elPlay.addEventListener('click', play);
     elPause.addEventListener('click', pause);
     elStop.addEventListener('click', stop);
+
+    // Load saved custom voicings
+    loadCustomVoicings();
 
     // Load first progression
     onProgressionSelected();
@@ -143,17 +167,14 @@
       // Load from user's songbook
       var songs = window.Songbook ? window.Songbook.getSongs() : [];
       songs.forEach(function (song) {
-        var chords = window.Songbook.extractChords(song.content);
-        if (chords.length === 0) return;
-        // Deduplicate consecutive same chords
-        var unique = [chords[0]];
-        for (var i = 1; i < chords.length; i++) {
-          if (chords[i] !== chords[i - 1]) unique.push(chords[i]);
-        }
+        var segments = parseSongSegments(song.content);
+        if (segments.length === 0) return;
+        var allChords = segments.map(function (s) { return s.chord; });
         var opt = document.createElement('option');
         opt.value = 'song-' + song.id;
-        opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '') + ' (' + unique.length + ' acordes)';
-        opt.dataset.chords = JSON.stringify(unique);
+        opt.textContent = song.title + (song.artist ? ' – ' + song.artist : '') + ' (' + allChords.length + ' acordes)';
+        opt.dataset.chords = JSON.stringify(allChords);
+        opt.dataset.segments = JSON.stringify(segments);
         elProgression.appendChild(opt);
       });
       if (songs.length === 0) {
@@ -182,6 +203,8 @@
     if (!id) {
       state.chords = [];
       state.voicings = [];
+      state.songSegments = [];
+      state.isSong = false;
       renderStrip();
       renderCurrentChord();
       return;
@@ -192,10 +215,14 @@
       var opt = elProgression.querySelector('option[value="' + id + '"]');
       if (opt && opt.dataset.chords) {
         state.chords = JSON.parse(opt.dataset.chords);
+        state.songSegments = opt.dataset.segments ? JSON.parse(opt.dataset.segments) : [];
+        state.isSong = true;
         state.beatsPerChord = 4;
         state.selectedId = id;
       } else {
         state.chords = [];
+        state.songSegments = [];
+        state.isSong = false;
       }
     } else {
       var list = Progressions.getByCategory(state.category);
@@ -210,6 +237,8 @@
       state.selectedId = prog.id;
       state.chords = prog.chords;
       state.beatsPerChord = prog.beatsPerChord || 4;
+      state.songSegments = [];
+      state.isSong = false;
     }
 
     state.currentChordIndex = 0;
@@ -218,6 +247,7 @@
     computeVoicings();
     renderStrip();
     renderCurrentChord();
+    renderKaraoke();
   }
 
   // ── Voicing computation ──
@@ -244,6 +274,10 @@
     var zone = parseZone(state.positionZone);
 
     state.voicings = state.chords.map(function (chordName, i) {
+      // Check for user-selected custom voicing first
+      var custom = getCustomVoicing(state.selectedId, i);
+      if (custom) return custom;
+
       var parsed = Parser.parseChord(chordName);
       if (!parsed) return null;
 
@@ -327,6 +361,7 @@
     }
 
     updateStripHighlight();
+    renderKaraoke();
   }
 
   // ── Voicing to MIDI ──
@@ -383,13 +418,17 @@
         Audio.playClick(isFirstBeat);
       }
 
-      // On first beat: play chord + update diagram
+      // On first beat: play chord/arpeggio + update diagram
       if (isFirstBeat) {
         var voicing = state.voicings[state.currentChordIndex];
         if (voicing && state.soundOn) {
-          var midi = voicingToMidi(voicing);
           var chordDuration = Math.max((state.beatsPerChord * intervalMs) / 1000, 1.5);
-          Audio.playChord(midi, chordDuration);
+          if (state.arpeggioMode) {
+            playArpeggio(voicing, chordDuration);
+          } else {
+            var midi = voicingToMidi(voicing);
+            Audio.playChord(midi, chordDuration);
+          }
         }
         renderCurrentChord();
       }
@@ -423,6 +462,7 @@
     state.playing = false;
     state.paused = true;
 
+    clearArpeggioTimeouts();
     Audio.stopAll();
 
     if (elPlay) { elPlay.disabled = false; elPlay.style.opacity = '1'; }
@@ -442,6 +482,7 @@
     state.beatInChord = 0;
     state.currentChordIndex = 0;
 
+    clearArpeggioTimeouts();
     Audio.stopAll();
 
     if (elPlay) { elPlay.disabled = false; elPlay.style.opacity = '1'; }
@@ -524,6 +565,246 @@
       stop();
       play();
     }
+  }
+
+  // ── Song content parsing ──
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /**
+   * Parse song content into segments: [{chord, lyrics}, ...]
+   * Each segment is one chord occurrence with its associated lyrics text.
+   */
+  function parseSongSegments(content) {
+    if (!content) return [];
+    var segments = [];
+    var parts = content.split(/\[([^\]]+)\]/);
+    // parts = [textBefore, chord1, textAfter1, chord2, textAfter2, ...]
+    for (var i = 1; i < parts.length; i += 2) {
+      var chord = parts[i].trim();
+      var lyrics = (parts[i + 1] || '').replace(/\n+/g, ' ').trim();
+      segments.push({ chord: chord, lyrics: lyrics });
+    }
+    return segments;
+  }
+
+  /**
+   * Format a karaoke segment as HTML: chord name + lyrics text
+   */
+  function formatKaraokeSegment(segment) {
+    if (!segment) return '';
+    var html = '<span class="karaoke-chord">[' + escapeHtml(segment.chord) + ']</span>';
+    if (segment.lyrics) {
+      html += ' ' + escapeHtml(segment.lyrics);
+    }
+    return html;
+  }
+
+  /**
+   * Render the karaoke lyrics display for the current chord
+   */
+  function renderKaraoke() {
+    if (!elLyricsKaraoke) return;
+
+    if (!state.isSong || state.songSegments.length === 0) {
+      elLyricsKaraoke.style.display = 'none';
+      return;
+    }
+
+    elLyricsKaraoke.style.display = '';
+    var idx = state.currentChordIndex;
+    var current = state.songSegments[idx];
+    var next = state.songSegments[idx + 1];
+
+    elKaraokeCurrent.innerHTML = current ? formatKaraokeSegment(current) : '';
+    elKaraokeNext.innerHTML = next ? formatKaraokeSegment(next) : '';
+  }
+
+  // ── Custom voicing persistence ──
+
+  var CUSTOM_VOICINGS_KEY = 'cp-custom-voicings';
+
+  function loadCustomVoicings() {
+    try {
+      state.customVoicings = JSON.parse(localStorage.getItem(CUSTOM_VOICINGS_KEY)) || {};
+    } catch (e) { state.customVoicings = {}; }
+  }
+
+  function saveCustomVoicing(progId, chordIdx, voicing) {
+    if (!progId) return;
+    if (!state.customVoicings[progId]) state.customVoicings[progId] = {};
+    state.customVoicings[progId][chordIdx] = {
+      frets: voicing.frets,
+      noteNames: voicing.noteNames,
+      barre: voicing.barre,
+      fingers: voicing.fingers
+    };
+    try {
+      localStorage.setItem(CUSTOM_VOICINGS_KEY, JSON.stringify(state.customVoicings));
+    } catch (e) { /* ignore */ }
+  }
+
+  function getCustomVoicing(progId, chordIdx) {
+    if (!progId || !state.customVoicings[progId]) return null;
+    return state.customVoicings[progId][chordIdx] || null;
+  }
+
+  // ── Voicing picker ──
+
+  function bankEntryToVoicing(entry) {
+    var frets = entry.frets;
+    var noteNames = frets.map(function (f, i) {
+      if (f === -1) return 'X';
+      return window.MusicTheory.pcToName(window.MusicTheory.fretToPC(i, f));
+    });
+    var barre = Voicings.detectBarre(frets);
+    var fingers = Voicings.suggestFingers(frets, barre);
+    return { frets: frets, noteNames: noteNames, barre: barre, fingers: fingers };
+  }
+
+  function openVoicingPicker(chordIdx) {
+    var chordName = state.chords[chordIdx];
+    if (!chordName) return;
+
+    var modal = document.getElementById('voicing-picker-modal');
+    var grid = document.getElementById('voicing-picker-grid');
+    var title = document.getElementById('voicing-picker-title');
+
+    title.textContent = 'Elegir voicing: ' + chordName;
+    grid.innerHTML = '';
+
+    var currentFrets = state.voicings[chordIdx] ? state.voicings[chordIdx].frets.join(',') : '';
+
+    // 1) Pinned voicings from song
+    if (state.isSong && state.selectedId) {
+      var songId = state.selectedId.replace('song-', '');
+      var song = window.Songbook ? window.Songbook.getSong(songId) : null;
+      if (song && song.pinnedVoicings) {
+        song.pinnedVoicings.forEach(function (pv) {
+          if (pv.chord !== chordName) return;
+          var voicing = bankEntryToVoicing(pv);
+          var card = createVoicingPickerCard(voicing, chordName, chordIdx, currentFrets, 'Pineado');
+          grid.appendChild(card);
+        });
+      }
+    }
+
+    // 2) Personal voicings from ChordBank
+    if (window.ChordBank) {
+      var saved = window.ChordBank.getByName(chordName);
+      saved.forEach(function (sv) {
+        var voicing = bankEntryToVoicing(sv);
+        // Skip if already added as pinned
+        var key = voicing.frets.join(',');
+        if (grid.querySelector('[data-frets="' + key + '"]')) return;
+        var card = createVoicingPickerCard(voicing, chordName, chordIdx, currentFrets, 'Personal');
+        grid.appendChild(card);
+      });
+    }
+
+    // 3) Generated voicings by categories
+    var chord = Parser.parseChord(chordName);
+    if (chord) {
+      var categories = ['common', 'shell', 'drop2', 'rootless'];
+      var seen = {};
+      // Mark already-shown voicings
+      grid.querySelectorAll('[data-frets]').forEach(function (el) {
+        seen[el.dataset.frets] = true;
+      });
+
+      categories.forEach(function (cat) {
+        var results = Voicings.findVoicings(chord, { category: cat });
+        results.slice(0, 8).forEach(function (v) {
+          var key = v.frets.join(',');
+          if (seen[key]) return;
+          seen[key] = true;
+          var label = cat === 'common' ? '' : cat.charAt(0).toUpperCase() + cat.slice(1);
+          var card = createVoicingPickerCard(v, chordName, chordIdx, currentFrets, label);
+          grid.appendChild(card);
+        });
+      });
+    }
+
+    if (grid.children.length === 0) {
+      grid.innerHTML = '<p style="color:#888;text-align:center;">No se encontraron voicings.</p>';
+    }
+
+    modal.style.display = 'flex';
+
+    // Close handlers
+    var closeBtn = document.getElementById('voicing-picker-close');
+    closeBtn.onclick = function () { modal.style.display = 'none'; };
+    modal.onclick = function (e) {
+      if (e.target === modal) modal.style.display = 'none';
+    };
+  }
+
+  function createVoicingPickerCard(voicing, chordName, chordIdx, currentFrets, badge) {
+    var card = document.createElement('div');
+    card.className = 'voicing-card picker-card';
+    card.dataset.frets = voicing.frets.join(',');
+
+    // Highlight current voicing
+    if (voicing.frets.join(',') === currentFrets) {
+      card.classList.add('pinned');
+    }
+
+    var opts = badge ? { badge: badge } : {};
+    card.appendChild(Diagram.createDiagram(voicing, chordName, opts));
+
+    card.addEventListener('click', function () {
+      // Apply this voicing
+      state.voicings[chordIdx] = voicing;
+      saveCustomVoicing(state.selectedId, chordIdx, voicing);
+      renderCurrentChord();
+
+      // Flash confirmation
+      card.classList.add('pinned');
+      card.classList.remove('pin-flash');
+      void card.offsetWidth;
+      card.classList.add('pin-flash');
+
+      // Close after brief delay
+      setTimeout(function () {
+        document.getElementById('voicing-picker-modal').style.display = 'none';
+      }, 350);
+    });
+
+    return card;
+  }
+
+  // ── Arpeggio playback ──
+
+  function playArpeggio(voicing, totalDurationSec) {
+    if (!voicing || !voicing.frets) return;
+
+    // Get midi notes from voicing (low to high)
+    var midiNotes = voicing.frets
+      .map(function (f, i) { return f === -1 ? null : STANDARD_TUNING[i] + f; })
+      .filter(function (n) { return n !== null; });
+
+    if (midiNotes.length === 0) return;
+
+    // Clear any previous arpeggio
+    clearArpeggioTimeouts();
+
+    // Space notes evenly across the beat duration
+    var noteInterval = (totalDurationSec * 1000) / (midiNotes.length + 1);
+    var noteDuration = Math.max(totalDurationSec * 0.8, 1.0);
+
+    midiNotes.forEach(function (midi, idx) {
+      var tid = setTimeout(function () {
+        Audio.playNote(midi, noteDuration);
+      }, idx * noteInterval);
+      state._arpeggioTimeouts.push(tid);
+    });
+  }
+
+  function clearArpeggioTimeouts() {
+    state._arpeggioTimeouts.forEach(function (tid) { clearTimeout(tid); });
+    state._arpeggioTimeouts = [];
   }
 
   // ── Public ──

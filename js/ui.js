@@ -162,13 +162,6 @@
     // Manual add
     document.getElementById('btn-manual-save').addEventListener('click', saveManualVoicing);
 
-    // Export / Import (chords)
-    document.getElementById('btn-export').addEventListener('click', handleExport);
-    document.getElementById('btn-import').addEventListener('click', () => {
-      document.getElementById('file-import').click();
-    });
-    document.getElementById('file-import').addEventListener('change', handleImport);
-
     // Nav principal
     document.getElementById('nav-chords').addEventListener('click', () => showSection('chords'));
     document.getElementById('nav-scales').addEventListener('click', () => showSection('scales'));
@@ -1059,34 +1052,6 @@
     }
   }
 
-  // ── Export / Import ─────────────────────────────────────────
-
-  function handleExport() {
-    const json = Bank.exportJSON();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'mis-acordes.json'; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        Bank.importJSON(reader.result);
-        updateBankCount();
-        if (currentTab === 'bank') renderBankView();
-      } catch (err) {
-        alert('Error al importar: archivo JSON invalido.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }
-
   function updateBankCount() {
     const count = Bank.count();
     const badge = document.getElementById('bank-count');
@@ -1148,31 +1113,6 @@
   function initSongListEvents() {
     document.getElementById('btn-new-song').addEventListener('click', () => {
       window.SongEditor.open(null);
-    });
-    // Export/import songbook
-    document.getElementById('btn-export-songs').addEventListener('click', () => {
-      const json = SB.exportJSON();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'mi-cancionero.json'; a.click();
-      URL.revokeObjectURL(url);
-    });
-    document.getElementById('btn-import-songs').addEventListener('click', () => {
-      document.getElementById('file-import-songs').click();
-    });
-    document.getElementById('file-import-songs').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          SB.importJSON(reader.result);
-          SongListView.render();
-        } catch { alert('Error al importar cancionero.'); }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
     });
   }
 

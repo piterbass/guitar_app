@@ -32,6 +32,11 @@
   let elFretboard;
   let elBeatIndicator;
   let elLoopToggle;
+  // Advanced practice modes
+  let elAdvancedToggle, elAdvancedPanel;
+  let elZoneEnabled, elZoneControls, elZoneFretMin, elZoneFretMax, elZoneStringMin, elZoneStringMax;
+  let elStringMode, elStringPairInfo;
+  let elTransposeAll, elTransposeInfo;
 
   // ── State ──
   let practiceState = {
@@ -61,6 +66,18 @@
     progressionCurrentIdx: 0,
     progressionNotesPlayed: 0,
     progressionNotesPerChord: 0,
+    // advanced practice modes
+    zoneEnabled: false,
+    zoneFretMin: 0,
+    zoneFretMax: 7,
+    zoneStringMin: 0,   // 0 = 6ª cuerda (E grave)
+    zoneStringMax: 3,    // 3 = 3ª cuerda (G)
+    stringMode: 'all',   // 'all' | 'pairs' | 'skip'
+    _stringPairIndex: 0, // current pair/skip group index
+    transposeAllKeys: false,
+    _transposeSemitones: 0,  // current transposition offset (0-11)
+    _transposeOriginalRootPc: null,
+    _transposeOriginalScaleMap: null,
   };
 
   // ── Init ──
@@ -90,6 +107,20 @@
     elProgInfo         = document.getElementById('practice-prog-info');
     elProgScaleEditor  = document.getElementById('practice-prog-scale-editor');
     elProgEditorToggle = document.getElementById('practice-prog-editor-toggle');
+
+    // Advanced practice modes
+    elAdvancedToggle   = document.getElementById('practice-advanced-toggle');
+    elAdvancedPanel    = document.getElementById('practice-advanced-panel');
+    elZoneEnabled      = document.getElementById('practice-zone-enabled');
+    elZoneControls     = document.getElementById('practice-zone-controls');
+    elZoneFretMin      = document.getElementById('practice-zone-fret-min');
+    elZoneFretMax      = document.getElementById('practice-zone-fret-max');
+    elZoneStringMin    = document.getElementById('practice-zone-string-min');
+    elZoneStringMax    = document.getElementById('practice-zone-string-max');
+    elStringMode       = document.getElementById('practice-string-mode');
+    elStringPairInfo   = document.getElementById('practice-string-pair-info');
+    elTransposeAll     = document.getElementById('practice-transpose-all');
+    elTransposeInfo    = document.getElementById('practice-transpose-info');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -130,6 +161,43 @@
     elPlayBtn.addEventListener('click', play);
     elPauseBtn.addEventListener('click', pause);
     elStopBtn.addEventListener('click', stop);
+
+    // Advanced practice mode events
+    if (elAdvancedToggle) elAdvancedToggle.addEventListener('click', function () {
+      var visible = elAdvancedPanel.style.display !== 'none';
+      elAdvancedPanel.style.display = visible ? 'none' : '';
+      elAdvancedToggle.innerHTML = (visible ? '&#9656;' : '&#9662;') + ' Modos de práctica';
+    });
+    if (elZoneEnabled) elZoneEnabled.addEventListener('change', function () {
+      practiceState.zoneEnabled = this.checked;
+      elZoneControls.style.display = this.checked ? '' : 'none';
+      if (practiceState.playing) { stop(); }
+      renderFretboard();
+    });
+    [elZoneFretMin, elZoneFretMax, elZoneStringMin, elZoneStringMax].forEach(function (el) {
+      if (el) el.addEventListener('change', function () {
+        practiceState.zoneFretMin = parseInt(elZoneFretMin.value) || 0;
+        practiceState.zoneFretMax = parseInt(elZoneFretMax.value) || 22;
+        practiceState.zoneStringMin = parseInt(elZoneStringMin.value) || 0;
+        practiceState.zoneStringMax = parseInt(elZoneStringMax.value) || 5;
+        if (practiceState.playing) { stop(); }
+        renderFretboard();
+      });
+    });
+    if (elStringMode) elStringMode.addEventListener('change', function () {
+      practiceState.stringMode = this.value;
+      practiceState._stringPairIndex = 0;
+      updateStringModeInfo();
+      if (practiceState.playing) { stop(); }
+    });
+    if (elTransposeAll) elTransposeAll.addEventListener('change', function () {
+      practiceState.transposeAllKeys = this.checked;
+      elTransposeInfo.style.display = this.checked ? '' : 'none';
+      if (this.checked) {
+        elTransposeInfo.textContent = 'Al terminar la secuencia, transpone +1 semitono y repite (12 tonos)';
+      }
+      if (practiceState.playing) { stop(); }
+    });
 
     // Initial
     onScaleChanged();
@@ -643,12 +711,23 @@
   function renderProgStrip() {
     if (!elProgStrip) return;
     elProgStrip.innerHTML = '';
+    var semi = practiceState._transposeSemitones || 0;
     practiceState.progressionChords.forEach(function (chord, i) {
       var chip = document.createElement('span');
       chip.className = 'cp-chord-chip';
       if (i === practiceState.progressionCurrentIdx) chip.classList.add('current');
       else if (i === practiceState.progressionCurrentIdx + 1) chip.classList.add('next');
-      chip.textContent = chord;
+      // Show transposed chord name if transposing
+      var displayChord = chord;
+      if (semi > 0 && window.ChordParser) {
+        var parsed = window.ChordParser.parseChord(chord);
+        if (parsed) {
+          var newRootPc = (parsed.rootPc + semi) % 12;
+          var newRoot = window.MusicTheory.pcToName(newRootPc);
+          displayChord = newRoot + chord.replace(/^[A-G][#b]?/, '');
+        }
+      }
+      chip.textContent = displayChord;
       elProgStrip.appendChild(chip);
     });
   }
@@ -656,6 +735,11 @@
   function advanceProgChord() {
     practiceState.progressionCurrentIdx++;
     if (practiceState.progressionCurrentIdx >= practiceState.progressionChords.length) {
+      // If we have string groups or transpose pending, signal cycle end
+      var hasAdvancedModes = practiceState.stringMode !== 'all' || practiceState.transposeAllKeys;
+      if (hasAdvancedModes) {
+        return false; // signal cycle end for advanceAfterCycle to handle
+      }
       if (practiceState.loopOn) {
         practiceState.progressionCurrentIdx = 0;
       } else {
@@ -810,15 +894,109 @@
     const pos = practiceState.positions[practiceState.selectedPosition];
     if (!pos) return;
 
+    // If zone mode, filter position notes to show only zone notes
+    var displayNotes = pos.noteData;
+    var displayFretRange = pos.fretRange;
+
+    if (practiceState.zoneEnabled) {
+      displayNotes = filterNotesByZone(pos.noteData);
+      var fMin = Math.min(practiceState.zoneFretMin, practiceState.zoneFretMax);
+      var fMax = Math.max(practiceState.zoneFretMin, practiceState.zoneFretMax);
+      displayFretRange = [fMin, fMax];
+    }
+
+    // If string pair/skip mode, further filter to show active group
+    if (practiceState.stringMode !== 'all') {
+      var groups = getStringGroups();
+      if (groups.length > 0) {
+        var groupIdx = practiceState._stringPairIndex % groups.length;
+        displayNotes = filterNotesByStringGroup(displayNotes, groups[groupIdx]);
+      }
+    }
+
     const svg = FB.createFullFretboard({
       rootPc: practiceState.rootPc,
       scalePCs: practiceState.scalePCs,
-      positionNotes: pos.noteData,
-      fretRange: pos.fretRange,
+      positionNotes: displayNotes,
+      fretRange: displayFretRange,
       showFullScale: false,
       showIntervals: false,
     });
     elFretboard.appendChild(svg);
+  }
+
+  // ── String mode info ──
+
+  function updateStringModeInfo() {
+    if (!elStringPairInfo) return;
+    var mode = practiceState.stringMode;
+    if (mode === 'all') {
+      elStringPairInfo.style.display = 'none';
+      return;
+    }
+    elStringPairInfo.style.display = '';
+    var groups = getStringGroups();
+    var STRING_LABELS = ['6ª(E)', '5ª(A)', '4ª(D)', '3ª(G)', '2ª(B)', '1ª(e)'];
+    var desc = groups.map(function (g) {
+      return g.map(function (s) { return STRING_LABELS[s]; }).join(' + ');
+    }).join('  →  ');
+    elStringPairInfo.textContent = (mode === 'pairs' ? 'Pares: ' : 'Saltos: ') + desc;
+  }
+
+  function getStringGroups() {
+    var mode = practiceState.stringMode;
+    var minS = 0, maxS = 5;
+
+    // If zone filtering is on, use zone string range
+    if (practiceState.zoneEnabled) {
+      minS = Math.min(practiceState.zoneStringMin, practiceState.zoneStringMax);
+      maxS = Math.max(practiceState.zoneStringMin, practiceState.zoneStringMax);
+    }
+
+    var groups = [];
+    if (mode === 'pairs') {
+      // Consecutive pairs: 0-1, 1-2, 2-3, 3-4, 4-5 (within range)
+      for (var s = minS; s < maxS; s++) {
+        groups.push([s, s + 1]);
+      }
+      if (groups.length === 0 && minS === maxS) groups.push([minS]);
+    } else if (mode === 'skip') {
+      // Skip strings: even strings, then odd strings
+      // e.g., 0-2-4, 1-3-5
+      var even = [], odd = [];
+      for (var s = minS; s <= maxS; s++) {
+        if ((s - minS) % 2 === 0) even.push(s);
+        else odd.push(s);
+      }
+      if (even.length > 0) groups.push(even);
+      if (odd.length > 0) groups.push(odd);
+    }
+    return groups;
+  }
+
+  // ── Filter notes by zone and string group ──
+
+  function filterNotesByZone(noteData) {
+    var notes = noteData;
+
+    if (practiceState.zoneEnabled) {
+      var fMin = Math.min(practiceState.zoneFretMin, practiceState.zoneFretMax);
+      var fMax = Math.max(practiceState.zoneFretMin, practiceState.zoneFretMax);
+      var sMin = Math.min(practiceState.zoneStringMin, practiceState.zoneStringMax);
+      var sMax = Math.max(practiceState.zoneStringMin, practiceState.zoneStringMax);
+
+      notes = notes.filter(function (n) {
+        return n.fret >= fMin && n.fret <= fMax && n.string >= sMin && n.string <= sMax;
+      });
+    }
+
+    return notes;
+  }
+
+  function filterNotesByStringGroup(notes, groupStrings) {
+    var stringSet = {};
+    groupStrings.forEach(function (s) { stringSet[s] = true; });
+    return notes.filter(function (n) { return stringSet[n.string]; });
   }
 
   // ── Build notes for playback ──
@@ -827,12 +1005,28 @@
     const pos = practiceState.positions[practiceState.selectedPosition];
     if (!pos) return [];
 
-    const sorted = [...pos.noteData].sort((a, b) => {
+    // Start with full position notes
+    var notes = [...pos.noteData];
+
+    // Apply zone filtering
+    notes = filterNotesByZone(notes);
+
+    // Apply string group filtering (pairs/skip mode)
+    if (practiceState.stringMode !== 'all') {
+      var groups = getStringGroups();
+      if (groups.length > 0) {
+        var groupIdx = practiceState._stringPairIndex % groups.length;
+        notes = filterNotesByStringGroup(notes, groups[groupIdx]);
+      }
+    }
+
+    // Sort: string ascending (grave to agudo), then fret ascending
+    notes.sort(function (a, b) {
       if (a.string !== b.string) return a.string - b.string;
       return a.fret - b.fret;
     });
 
-    const midiNotes = sorted.map(n => n.midi);
+    const midiNotes = notes.map(function (n) { return n.midi; });
 
     if (practiceState.direction === 'descending') {
       return midiNotes.reverse();
@@ -846,6 +1040,79 @@
 
   // ── Play / Stop ──
 
+  // ── Transpose helpers ──
+
+  function applyTranspose(semitones) {
+    var { getScalePCs } = window.MusicTheory;
+    if (practiceState.progressionMode) {
+      // Transpose all chords in the scale map
+      practiceState.progressionScaleMap = practiceState._transposeOriginalScaleMap.map(function (m) {
+        return {
+          rootPc: (m.rootPc + semitones) % 12,
+          scaleKey: m.scaleKey,
+          positionOverrides: m.positionOverrides,
+        };
+      });
+      applyProgChordScale(practiceState.progressionCurrentIdx);
+      renderProgStrip();
+    } else {
+      practiceState.rootPc = (practiceState._transposeOriginalRootPc + semitones) % 12;
+      practiceState.scalePCs = getScalePCs(practiceState.rootPc, practiceState.scaleKey);
+      practiceState.positions = Engine.generatePositions(practiceState.rootPc, practiceState.scaleKey);
+      practiceState.selectedPosition = Math.min(practiceState.selectedPosition, practiceState.positions.length - 1);
+      if (elRootSelect) elRootSelect.value = practiceState.rootPc;
+      populatePositionSelector();
+      if (elPositionSelect) elPositionSelect.value = practiceState.selectedPosition;
+      renderFretboard();
+    }
+    updateTransposeInfo();
+  }
+
+  function updateTransposeInfo() {
+    if (!elTransposeInfo || !practiceState.transposeAllKeys) return;
+    var semi = practiceState._transposeSemitones;
+    var rootName = window.MusicTheory.pcToName(
+      practiceState.progressionMode
+        ? practiceState.progressionScaleMap[0].rootPc
+        : practiceState.rootPc
+    );
+    elTransposeInfo.textContent = 'Tono actual: ' + rootName + ' (+' + semi + ' semitonos) — ' + (12 - semi) + ' tonos restantes';
+  }
+
+  // ── Advance string group or transpose after a cycle ──
+
+  function advanceAfterCycle() {
+    // 1. If string pairs/skip mode: advance to next group
+    if (practiceState.stringMode !== 'all') {
+      var groups = getStringGroups();
+      practiceState._stringPairIndex++;
+      if (practiceState._stringPairIndex < groups.length) {
+        // More groups to play in this key
+        updateStringModeInfo();
+        return true; // continue
+      }
+      // All groups done, reset for next cycle
+      practiceState._stringPairIndex = 0;
+      updateStringModeInfo();
+    }
+
+    // 2. If transpose all keys: advance semitone
+    if (practiceState.transposeAllKeys) {
+      practiceState._transposeSemitones++;
+      if (practiceState._transposeSemitones < 12) {
+        applyTranspose(practiceState._transposeSemitones);
+        return true; // continue
+      }
+      // All 12 keys done
+      practiceState._transposeSemitones = 0;
+      applyTranspose(0);
+      // Fall through to loop check
+    }
+
+    // 3. Check loop
+    return practiceState.loopOn;
+  }
+
   function play() {
     if (practiceState.playing) return;
 
@@ -856,11 +1123,20 @@
     if (!practiceState.paused) {
       practiceState._noteIndex = 0;
       practiceState._beatCount = 0;
+      practiceState._stringPairIndex = 0;
+      practiceState._transposeSemitones = 0;
+
+      // Save original roots for transpose
       if (practiceState.progressionMode) {
+        practiceState._transposeOriginalScaleMap = practiceState.progressionScaleMap.map(function (m) {
+          return { rootPc: m.rootPc, scaleKey: m.scaleKey, positionOverrides: m.positionOverrides };
+        });
         practiceState.progressionCurrentIdx = 0;
         applyProgChordScale(0);
         renderProgStrip();
         practiceState._currentNotes = buildMidiNotes();
+      } else {
+        practiceState._transposeOriginalRootPc = practiceState.rootPc;
       }
     }
     practiceState.playing = true;
@@ -900,11 +1176,11 @@
       }
 
       // Play note
-      if (practiceState.soundOn) Audio.playNote(midi, noteDuration);
+      if (midi !== undefined && practiceState.soundOn) Audio.playNote(midi, noteDuration);
 
       // Highlight on fretboard
       FB.clearHighlights();
-      FB.highlightNoteMidi(midi);
+      if (midi !== undefined) FB.highlightNoteMidi(midi);
 
       // Beat indicator
       updateBeatIndicator(idx, practiceState._currentNotes.length, false);
@@ -916,18 +1192,34 @@
         if (practiceState.progressionMode) {
           var canContinue = advanceProgChord();
           if (!canContinue) {
-            stop();
-            return;
+            // Progression finished one full cycle
+            var canAdvance = advanceAfterCycle();
+            if (canAdvance) {
+              // Reset progression to beginning for the new cycle
+              practiceState.progressionCurrentIdx = 0;
+              applyProgChordScale(0);
+              renderProgStrip();
+            } else {
+              stop();
+              return;
+            }
           }
-          // Rebuild notes for new scale
+          // Rebuild notes for new scale/group
           practiceState._currentNotes = buildMidiNotes();
-          practiceState._noteIndex = 0;
-          practiceState._beatCount++;
-        } else if (practiceState.loopOn) {
+          if (practiceState._currentNotes.length === 0) { stop(); return; }
           practiceState._noteIndex = 0;
           practiceState._beatCount++;
         } else {
-          stop();
+          // Non-progression mode
+          var canAdvance = advanceAfterCycle();
+          if (canAdvance) {
+            practiceState._currentNotes = buildMidiNotes();
+            if (practiceState._currentNotes.length === 0) { stop(); return; }
+            practiceState._noteIndex = 0;
+            practiceState._beatCount++;
+          } else {
+            stop();
+          }
         }
       }
     }, intervalMs);
@@ -960,9 +1252,23 @@
     practiceState.paused = false;
     practiceState._noteIndex = 0;
     practiceState._beatCount = 0;
+    practiceState._stringPairIndex = 0;
+
+    // Restore original key if transposed
+    if (practiceState._transposeSemitones > 0 && practiceState._transposeOriginalRootPc !== null) {
+      practiceState._transposeSemitones = 0;
+      applyTranspose(0);
+    }
+    practiceState._transposeSemitones = 0;
 
     // Reset progression to beginning
     if (practiceState.progressionMode) {
+      // Restore original scale map if it was transposed
+      if (practiceState._transposeOriginalScaleMap) {
+        practiceState.progressionScaleMap = practiceState._transposeOriginalScaleMap.map(function (m) {
+          return { rootPc: m.rootPc, scaleKey: m.scaleKey, positionOverrides: m.positionOverrides };
+        });
+      }
       practiceState.progressionCurrentIdx = 0;
       applyProgChordScale(0);
       renderProgStrip();

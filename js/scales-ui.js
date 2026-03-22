@@ -17,7 +17,7 @@
   let elPlayPosition, elPlayFull, elTempo;
   let elFlipStrings;
   let elTabExplore, elTabBank, elTabPractice, elTabBuilder, elExplorePanel, elBankPanel, elPracticePanel, elBuilderPanel, elBankCount;
-  let elBankList, elBankExport, elBankImport, elBankFile;
+  let elBankList;
 
   // ── Estado ────────────────────────────────────────────────
   let state = {
@@ -100,9 +100,6 @@
     elBankCount = document.getElementById('scales-bank-count');
     elBankList = document.getElementById('scales-bank-list');
     elFlipStrings = document.getElementById('scales-flip-strings');
-    elBankExport = document.getElementById('scales-bank-export');
-    elBankImport = document.getElementById('scales-bank-import');
-    elBankFile = document.getElementById('scales-bank-file');
 
     if (!elRootSelect || !elTypeSelect) return; // guard
 
@@ -151,11 +148,6 @@
 
     // Events - save
     elSaveBtn.addEventListener('click', saveCurrentScale);
-
-    // Events - bank export/import
-    elBankExport.addEventListener('click', handleExport);
-    elBankImport.addEventListener('click', () => elBankFile.click());
-    elBankFile.addEventListener('change', handleImport);
 
     // Keyboard navigation
     document.addEventListener('keydown', onKeyDown);
@@ -510,36 +502,6 @@
 
       elBankList.appendChild(card);
     });
-  }
-
-  // ── Export / Import ───────────────────────────────────────
-
-  function handleExport() {
-    const json = Bank.exportJSON();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mis-escalas.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      try {
-        Bank.importJSON(ev.target.result);
-        renderBankView();
-        updateBankCount();
-      } catch (err) {
-        console.error('Error importando escalas:', err);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   }
 
   // ── Cargar escala desde fuera (para integración futura) ───

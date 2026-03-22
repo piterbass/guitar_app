@@ -1717,8 +1717,54 @@
       margin-top: 10px;
     }
 
+    .cp-diagram {
+      cursor: pointer;
+    }
+
     .cp-diagram svg {
       max-height: 200px;
+    }
+
+    .cp-diagram-hint {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* Karaoke lyrics display */
+    .cp-lyrics-karaoke {
+      background: rgba(22, 33, 62, 0.7);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .cp-karaoke-current {
+      font-size: 1.2rem;
+      color: #fff;
+      line-height: 1.5;
+      min-height: 1.8em;
+    }
+
+    .cp-karaoke-current .karaoke-chord {
+      color: #4ecdc4;
+      font-weight: 700;
+    }
+
+    .cp-karaoke-next {
+      font-size: 0.95rem;
+      color: #888;
+      line-height: 1.4;
+      margin-top: 6px;
+      min-height: 1.4em;
+    }
+
+    .cp-karaoke-next .karaoke-chord {
+      color: #4ecdc488;
+      font-weight: 600;
     }
 
     @media (max-width: 700px) {
@@ -1923,6 +1969,95 @@
 
     .btn-practice-stop:hover:not(:disabled) {
       background: #d13550;
+    }
+
+    /* ── Modos de práctica avanzados ── */
+
+    .practice-advanced-section {
+      margin-bottom: 14px;
+    }
+
+    #practice-advanced-panel {
+      background: #0f1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .practice-zone-box {
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .practice-zone-box > label {
+      font-size: 0.8rem;
+      color: #888;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .practice-zone-box select {
+      padding: 5px 8px;
+      font-size: 0.9rem;
+    }
+
+    .practice-zone-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .zone-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .zone-row label {
+      color: #a0a0b0;
+      font-size: 0.85rem;
+      min-width: 60px;
+    }
+
+    .zone-row span {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .zone-input {
+      width: 70px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    select.zone-input {
+      width: auto;
+      min-width: 80px;
+      text-align: left;
+    }
+
+    .string-mode-info {
+      color: #4ecdc4;
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      background: rgba(78, 205, 196, 0.08);
+      border-radius: 4px;
+      margin-top: 4px;
     }
 
     /* Backup panel */
@@ -2539,7 +2674,14 @@
             <span class="cp-current-label" id="cp-current-name">--</span>
             <span class="cp-next-label" id="cp-next-name"></span>
           </div>
-          <div class="cp-diagram" id="cp-diagram"></div>
+          <div class="cp-diagram" id="cp-diagram" title="Toca para elegir voicing"></div>
+          <div class="cp-diagram-hint">Toca el diagrama para cambiar voicing</div>
+        </div>
+
+        <!-- Karaoke lyrics display -->
+        <div id="cp-lyrics-karaoke" class="cp-lyrics-karaoke" style="display:none;">
+          <div class="cp-karaoke-current" id="cp-karaoke-current"></div>
+          <div class="cp-karaoke-next" id="cp-karaoke-next"></div>
         </div>
 
         <!-- Controles metrónomo (igual que practice-mode) -->
@@ -2570,6 +2712,11 @@
           <div class="practice-control-box">
             <label class="toggle-label">
               <input type="checkbox" id="cp-loop" checked> Loop continuo
+            </label>
+          </div>
+          <div class="practice-control-box">
+            <label class="toggle-label">
+              <input type="checkbox" id="cp-arpeggio"> Arpegio
             </label>
           </div>
         </div>
@@ -2917,6 +3064,68 @@
         <div id="practice-prog-info" style="color:#4ecdc4; font-size:0.9rem; margin-bottom:6px; font-weight:600;"></div>
         <button id="practice-prog-editor-toggle" class="btn-small" style="display:none; margin-bottom:8px; font-size:0.8rem; color:#ffe66d; background:#16213e; border:1px solid #333;">&#9656; Configurar escalas</button>
         <div id="practice-prog-scale-editor" class="prog-scale-editor" style="display:none;"></div>
+
+        <!-- ── Modos de práctica avanzados ── -->
+        <div class="practice-advanced-section">
+          <button id="practice-advanced-toggle" class="btn-small" style="margin-bottom:8px; font-size:0.8rem; color:#ffe66d; background:#16213e; border:1px solid #333;">&#9656; Modos de práctica</button>
+          <div id="practice-advanced-panel" style="display:none;">
+
+            <!-- Práctica por zonas -->
+            <div class="practice-zone-box">
+              <label class="toggle-label">
+                <input type="checkbox" id="practice-zone-enabled"> Práctica por zonas
+              </label>
+              <div id="practice-zone-controls" class="practice-zone-controls" style="display:none;">
+                <div class="zone-row">
+                  <label>Trastes:</label>
+                  <input type="number" id="practice-zone-fret-min" min="0" max="22" value="0" class="zone-input">
+                  <span>a</span>
+                  <input type="number" id="practice-zone-fret-max" min="0" max="22" value="7" class="zone-input">
+                </div>
+                <div class="zone-row">
+                  <label>Cuerdas:</label>
+                  <select id="practice-zone-string-min" class="zone-input">
+                    <option value="0">6ª (E)</option>
+                    <option value="1">5ª (A)</option>
+                    <option value="2">4ª (D)</option>
+                    <option value="3">3ª (G)</option>
+                    <option value="4">2ª (B)</option>
+                    <option value="5">1ª (e)</option>
+                  </select>
+                  <span>a</span>
+                  <select id="practice-zone-string-max" class="zone-input">
+                    <option value="0">6ª (E)</option>
+                    <option value="1">5ª (A)</option>
+                    <option value="2">4ª (D)</option>
+                    <option value="3" selected>3ª (G)</option>
+                    <option value="4">2ª (B)</option>
+                    <option value="5">1ª (e)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Juego de cuerdas -->
+            <div class="practice-zone-box">
+              <label>Modo de cuerdas</label>
+              <select id="practice-string-mode">
+                <option value="all">Todas las cuerdas</option>
+                <option value="pairs">Juegos de 2 cuerdas</option>
+                <option value="skip">Salto de cuerdas</option>
+              </select>
+              <div id="practice-string-pair-info" class="string-mode-info" style="display:none;"></div>
+            </div>
+
+            <!-- Transponer por todos los tonos -->
+            <div class="practice-zone-box">
+              <label class="toggle-label">
+                <input type="checkbox" id="practice-transpose-all"> Transponer por todos los tonos
+              </label>
+              <div id="practice-transpose-info" class="string-mode-info" style="display:none;"></div>
+            </div>
+
+          </div>
+        </div>
 
         <!-- Diapasón -->
         <div id="practice-fretboard" class="scales-fretboard-container"></div>
