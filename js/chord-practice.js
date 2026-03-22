@@ -780,26 +780,43 @@
   function playArpeggio(voicing, totalDurationSec) {
     if (!voicing || !voicing.frets) return;
 
-    // Get midi notes from voicing (low to high)
-    var midiNotes = voicing.frets
-      .map(function (f, i) { return f === -1 ? null : STANDARD_TUNING[i] + f; })
-      .filter(function (n) { return n !== null; });
-
-    if (midiNotes.length === 0) return;
+    // Build note list with string index (low to high, skip muted)
+    var notes = [];
+    for (var s = 0; s < voicing.frets.length; s++) {
+      var f = voicing.frets[s];
+      if (f !== -1) {
+        notes.push({ midi: STANDARD_TUNING[s] + f, string: s });
+      }
+    }
+    if (notes.length === 0) return;
 
     // Clear any previous arpeggio
     clearArpeggioTimeouts();
 
     // Space notes evenly across the beat duration
-    var noteInterval = (totalDurationSec * 1000) / (midiNotes.length + 1);
+    var noteInterval = (totalDurationSec * 1000) / (notes.length + 1);
     var noteDuration = Math.max(totalDurationSec * 0.8, 1.0);
 
-    midiNotes.forEach(function (midi, idx) {
+    // Get the current diagram SVG for highlighting
+    var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
+
+    notes.forEach(function (note, idx) {
       var tid = setTimeout(function () {
-        Audio.playNote(midi, noteDuration);
+        // Clear previous highlight, then highlight current string
+        if (svg) {
+          Diagram.clearDiagramHighlights(svg);
+          Diagram.highlightString(svg, note.string);
+        }
+        Audio.playNote(note.midi, noteDuration);
       }, idx * noteInterval);
       state._arpeggioTimeouts.push(tid);
     });
+
+    // Clear highlights after last note
+    var clearTid = setTimeout(function () {
+      if (svg) Diagram.clearDiagramHighlights(svg);
+    }, notes.length * noteInterval);
+    state._arpeggioTimeouts.push(clearTid);
   }
 
   function clearArpeggioTimeouts() {

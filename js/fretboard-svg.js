@@ -119,6 +119,18 @@
         fill: '#333', rx: CFG.dotRadius * 0.7,
         'pointer-events': 'none'
       }));
+      // Invisible chord-dot markers per barre string (for arpeggio highlight)
+      for (let bs = b.fromString; bs <= b.toString; bs++) {
+        if (voicing.frets[bs] === b.fret) {
+          const bx = CFG.padLeft + bs * CFG.stringSpacing;
+          svg.appendChild(svgEl('circle', {
+            cx: bx, cy: barreY, r: CFG.dotRadius,
+            fill: 'transparent', 'pointer-events': 'none',
+            'data-string': bs, 'data-midi': STANDARD_TUNING[bs] + b.fret,
+            class: 'chord-dot'
+          }));
+        }
+      }
     }
 
     // Dots y markers por cada cuerda
@@ -141,7 +153,9 @@
         const openCircle = svgEl('circle', {
           cx: x, cy: CFG.padTop - 12,
           r: 5, fill: 'none', stroke: '#333', 'stroke-width': 1.5,
-          'pointer-events': 'none'
+          'pointer-events': 'none',
+          'data-string': s, 'data-midi': STANDARD_TUNING[s],
+          class: 'chord-dot'
         });
         svg.appendChild(openCircle);
       } else {
@@ -158,7 +172,9 @@
         } else {
           const dot = svgEl('circle', {
             cx: x, cy: y, r: CFG.dotRadius,
-            fill: '#333', 'pointer-events': 'none'
+            fill: '#333', 'pointer-events': 'none',
+            'data-string': s, 'data-midi': STANDARD_TUNING[s] + fret,
+            class: 'chord-dot'
           });
           svg.appendChild(dot);
         }
@@ -378,5 +394,49 @@
     svg.appendChild(group);
   }
 
-  window.FretboardSVG = { createDiagram, addScaleOverlay };
+  /**
+   * Highlight a specific string's dot in a chord diagram SVG.
+   * Uses the same visual style as FullFretboardSVG.highlightNoteMidi.
+   */
+  function highlightString(svg, stringIndex) {
+    if (!svg) return;
+    var dot = svg.querySelector('.chord-dot[data-string="' + stringIndex + '"]');
+    if (!dot) return;
+    dot.setAttribute('data-orig-fill', dot.getAttribute('fill') || '');
+    dot.setAttribute('data-orig-stroke', dot.getAttribute('stroke') || '');
+    dot.setAttribute('data-orig-stroke-width', dot.getAttribute('stroke-width') || '');
+    dot.setAttribute('data-orig-r', dot.getAttribute('r') || '');
+    dot.setAttribute('fill', '#ffe66d');
+    dot.setAttribute('stroke', '#fff');
+    dot.setAttribute('stroke-width', '2.5');
+    var origR = parseFloat(dot.getAttribute('data-orig-r')) || CFG.dotRadius;
+    dot.setAttribute('r', String(origR + 3));
+  }
+
+  /**
+   * Clear all arpeggio highlights from a chord diagram SVG.
+   */
+  function clearDiagramHighlights(svg) {
+    if (!svg) return;
+    var dots = svg.querySelectorAll('.chord-dot[data-orig-fill]');
+    dots.forEach(function (dot) {
+      var origFill = dot.getAttribute('data-orig-fill');
+      dot.setAttribute('fill', origFill);
+      dot.setAttribute('r', dot.getAttribute('data-orig-r') || String(CFG.dotRadius));
+      var origStroke = dot.getAttribute('data-orig-stroke');
+      if (origStroke) {
+        dot.setAttribute('stroke', origStroke);
+        dot.setAttribute('stroke-width', dot.getAttribute('data-orig-stroke-width') || '');
+      } else {
+        dot.removeAttribute('stroke');
+        dot.removeAttribute('stroke-width');
+      }
+      dot.removeAttribute('data-orig-fill');
+      dot.removeAttribute('data-orig-stroke');
+      dot.removeAttribute('data-orig-stroke-width');
+      dot.removeAttribute('data-orig-r');
+    });
+  }
+
+  window.FretboardSVG = { createDiagram, addScaleOverlay, highlightString, clearDiagramHighlights };
 })();
