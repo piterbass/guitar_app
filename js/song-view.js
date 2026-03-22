@@ -142,8 +142,9 @@
     if (speedIdx === 0) return;
 
     const px = SCROLL_SPEEDS[speedIdx];
+    const lyrics = document.getElementById('view-lyrics');
     scrollInterval = setInterval(() => {
-      window.scrollBy(0, px);
+      lyrics.scrollTop += px;
     }, SCROLL_TICK);
   }
 
