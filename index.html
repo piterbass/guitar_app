@@ -1037,6 +1037,68 @@
       border-color: #ff6b8a;
     }
 
+    /* Quick chord modal */
+    .quick-chord-box {
+      max-width: 260px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .quick-chord-box .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .quick-chord-box .modal-header h3 {
+      flex: 1;
+      text-align: center;
+      font-size: 1.2rem;
+    }
+
+    .quick-chord-box .modal-close {
+      position: absolute;
+      right: -4px;
+      top: -4px;
+    }
+
+    .quick-chord-arrow {
+      background: none;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      font-size: 1.1rem;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .quick-chord-arrow:hover {
+      background: #16213e;
+      border-color: #e94560;
+      color: #fff;
+    }
+
+    .quick-chord-diagram {
+      display: flex;
+      justify-content: center;
+      min-height: 180px;
+      align-items: center;
+    }
+
+    .quick-chord-counter {
+      color: #a0a0b0;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+
     #view-lyrics {
       padding: 20px;
       background: #0d1b36;
@@ -2983,6 +3045,20 @@
         <button class="btn-small btn-secondary" id="paste-import-cancel">Cancelar</button>
         <button class="btn-primary" id="paste-import-convert">Convertir e insertar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ════ Modal: Quick Chord View (song view) ════ -->
+  <div class="modal-overlay" id="quick-chord-modal">
+    <div class="modal-content quick-chord-box">
+      <div class="modal-header">
+        <button class="quick-chord-arrow" id="quick-chord-prev">&#9664;</button>
+        <h3 id="quick-chord-title">Acorde</h3>
+        <button class="quick-chord-arrow" id="quick-chord-next">&#9654;</button>
+        <button class="modal-close" id="quick-chord-close">&times;</button>
+      </div>
+      <div id="quick-chord-diagram" class="quick-chord-diagram"></div>
+      <div id="quick-chord-counter" class="quick-chord-counter"></div>
     </div>
   </div>
 

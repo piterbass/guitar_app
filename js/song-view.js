@@ -23,6 +23,11 @@
   // ── Transpose state ────────────────────────────────────────
   let transposeSemitones = 0;
 
+  // ── Quick chord modal state ────────────────────────────────
+  let qcVoicings = [];
+  let qcIndex = 0;
+  let qcChordName = '';
+
   // Mapa de notas preferidas para transposición (usa bemoles para tonalidades con bemoles)
   const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const FLAT_NAMES  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -57,10 +62,12 @@
       : transposeContent(song.content, transposeSemitones);
     container.innerHTML = window.SongEditor.renderContent(content, false);
 
-    // Hacer clickeables los chord-markers
+    // Click en acorde → abrir quick chord modal
     container.querySelectorAll('.chord-marker').forEach(el => {
       el.addEventListener('click', () => {
-        highlightPinned(el.dataset.chord);
+        const chordName = el.dataset.chord;
+        openQuickChord(chordName);
+        highlightPinned(chordName);
       });
     });
   }
@@ -191,6 +198,85 @@
     }
   }
 
+  // ── Quick Chord Modal ───────────────────────────────────────
+
+  function openQuickChord(chordName) {
+    qcChordName = chordName;
+    qcVoicings = [];
+    qcIndex = 0;
+
+    // 1) Voicings del banco personal primero
+    const saved = window.ChordBank.getByName(chordName);
+    saved.forEach(sv => {
+      qcVoicings.push(buildVoicing(sv.frets, chordName));
+    });
+
+    // 2) Voicings generados algorítmicamente (top comunes)
+    const chord = parseChord(chordName);
+    if (chord) {
+      const generated = window.VoicingFinder.findVoicings(chord);
+      // Tomar los primeros que no sean duplicados de los personales
+      const savedKeys = new Set(saved.map(s => s.frets.join(',')));
+      for (const v of generated) {
+        if (qcVoicings.length >= 4) break;
+        const key = v.frets.join(',');
+        if (!savedKeys.has(key)) {
+          qcVoicings.push(v);
+        }
+      }
+    }
+
+    // Si no hay ninguno, mostrar mensaje
+    if (qcVoicings.length === 0) {
+      qcVoicings = null;
+    }
+
+    renderQuickChord();
+
+    const modal = document.getElementById('quick-chord-modal');
+    modal.style.display = 'flex';
+  }
+
+  function buildVoicing(frets, chordName) {
+    const noteNames = frets.map((f, i) => {
+      if (f === -1) return 'X';
+      return MT.pcToName(MT.fretToPC(i, f));
+    });
+    const barre = window.VoicingFinder.detectBarre(frets);
+    const fingers = window.VoicingFinder.suggestFingers(frets, barre);
+    return { frets, noteNames, barre, fingers };
+  }
+
+  function renderQuickChord() {
+    const title = document.getElementById('quick-chord-title');
+    const diagram = document.getElementById('quick-chord-diagram');
+    const counter = document.getElementById('quick-chord-counter');
+
+    title.textContent = qcChordName;
+    diagram.innerHTML = '';
+
+    if (!qcVoicings || qcVoicings.length === 0) {
+      diagram.innerHTML = '<span style="color:#888;">No se encontraron voicings</span>';
+      counter.textContent = '';
+      return;
+    }
+
+    const v = qcVoicings[qcIndex];
+    const svg = createDiagram(v, qcChordName);
+    diagram.appendChild(svg);
+    counter.textContent = (qcIndex + 1) + ' / ' + qcVoicings.length;
+  }
+
+  function quickChordNav(delta) {
+    if (!qcVoicings || qcVoicings.length === 0) return;
+    qcIndex = ((qcIndex + delta) % qcVoicings.length + qcVoicings.length) % qcVoicings.length;
+    renderQuickChord();
+  }
+
+  function closeQuickChord() {
+    document.getElementById('quick-chord-modal').style.display = 'none';
+  }
+
   // ── Transpose ──────────────────────────────────────────────
 
   function transpose(delta) {
@@ -305,6 +391,19 @@
     // Transpose controls
     document.getElementById('btn-transpose-down').addEventListener('click', () => transpose(-1));
     document.getElementById('btn-transpose-up').addEventListener('click', () => transpose(1));
+
+    // Quick chord modal
+    const qcModal = document.getElementById('quick-chord-modal');
+    document.getElementById('quick-chord-close').addEventListener('click', closeQuickChord);
+    document.getElementById('quick-chord-prev').addEventListener('click', () => quickChordNav(-1));
+    document.getElementById('quick-chord-next').addEventListener('click', () => quickChordNav(1));
+    qcModal.addEventListener('click', (e) => { if (e.target === qcModal) closeQuickChord(); });
+    document.addEventListener('keydown', (e) => {
+      if (qcModal.style.display !== 'flex') return;
+      if (e.key === 'ArrowLeft') quickChordNav(-1);
+      else if (e.key === 'ArrowRight') quickChordNav(1);
+      else if (e.key === 'Escape') closeQuickChord();
+    });
   }
 
   if (document.readyState === 'loading') {
