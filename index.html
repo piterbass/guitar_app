@@ -740,10 +740,6 @@
       font-size: 1rem;
     }
 
-    #file-import,
-    #file-import-songs {
-      display: none;
-    }
 
     /* ── Canciones – Lista ───────────────────────── */
     .songs-header {
@@ -983,6 +979,62 @@
       padding: 0 !important;
       font-size: 1.1rem;
       text-align: center;
+    }
+
+    .view-controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .view-control-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+
+    .control-label {
+      color: #a0a0b0;
+      font-size: 0.8rem;
+      margin-right: 4px;
+    }
+
+    .control-value {
+      color: #ffe66d;
+      font-size: 0.85rem;
+      font-weight: 600;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .ctrl-btn {
+      width: 28px;
+      height: 28px;
+      padding: 0 !important;
+      font-size: 1rem;
+      line-height: 28px;
+      text-align: center;
+      border-radius: 50%;
+    }
+
+    .ctrl-play {
+      font-size: 0.85rem;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      background: #e94560;
+      border-color: #e94560;
+    }
+
+    .ctrl-play:hover {
+      background: #ff6b8a;
+      border-color: #ff6b8a;
     }
 
     #view-lyrics {
@@ -2033,6 +2085,10 @@
         margin: 0;
       }
 
+      .view-controls {
+        display: none !important;
+      }
+
       /* Header de la canción */
       .view-header {
         margin-bottom: 10px;
@@ -2347,11 +2403,6 @@
           </div>
         </div>
         <button class="btn-small" id="btn-manual-save">Guardar</button>
-        <div class="bank-toolbar">
-          <button class="btn-small btn-secondary" id="btn-export">Exportar JSON</button>
-          <button class="btn-small btn-secondary" id="btn-import">Importar JSON</button>
-          <input type="file" id="file-import" accept=".json">
-        </div>
       </div>
 
       <div class="bank-search" id="bank-search" style="display:none; margin-bottom:12px;">
@@ -2527,9 +2578,6 @@
         <h2>Mis Canciones</h2>
         <div class="songs-toolbar">
           <button class="btn-primary" id="btn-new-song">+ Nueva Cancion</button>
-          <button class="btn-small btn-secondary" id="btn-export-songs">Exportar</button>
-          <button class="btn-small btn-secondary" id="btn-import-songs">Importar</button>
-          <input type="file" id="file-import-songs" accept=".json">
         </div>
       </div>
       <div id="songs-list"></div>
@@ -2587,6 +2635,23 @@
           <button class="btn-small btn-secondary" id="btn-view-print">Imprimir PDF</button>
           <button class="btn-small btn-secondary" id="btn-view-edit">Editar</button>
           <button class="btn-small btn-secondary" id="btn-view-back">Volver</button>
+        </div>
+      </div>
+
+      <!-- Controles de scroll y transposición -->
+      <div class="view-controls">
+        <div class="view-control-group">
+          <span class="control-label">Scroll:</span>
+          <button class="btn-small ctrl-btn" id="btn-scroll-slower" title="Mas lento">-</button>
+          <button class="btn-small ctrl-btn ctrl-play" id="btn-scroll-play" title="Iniciar scroll">&#9654;</button>
+          <button class="btn-small ctrl-btn" id="btn-scroll-faster" title="Mas rapido">+</button>
+          <span class="control-value" id="scroll-speed-label">Off</span>
+        </div>
+        <div class="view-control-group">
+          <span class="control-label">Tono:</span>
+          <button class="btn-small ctrl-btn" id="btn-transpose-down" title="Bajar medio tono">-</button>
+          <span class="control-value" id="transpose-label">Original</span>
+          <button class="btn-small ctrl-btn" id="btn-transpose-up" title="Subir medio tono">+</button>
         </div>
       </div>
 
@@ -2786,11 +2851,6 @@
       <!-- ── Tab Mis Escalas ── -->
       <div id="scales-bank-panel" style="display:none;">
         <div id="scales-bank-list" class="scales-bank-list"></div>
-        <div class="scales-bank-actions" style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
-          <button id="scales-bank-export" class="btn-small">Exportar JSON</button>
-          <button id="scales-bank-import" class="btn-small">Importar JSON</button>
-          <input type="file" id="scales-bank-file" accept=".json" style="display:none;">
-        </div>
       </div>
 
       <!-- ── Tab Constructor ── -->
