@@ -142,9 +142,8 @@
     if (speedIdx === 0) return;
 
     const px = SCROLL_SPEEDS[speedIdx];
-    const section = document.getElementById('section-song-view');
     scrollInterval = setInterval(() => {
-      section.scrollTop += px;
+      window.scrollBy(0, px);
     }, SCROLL_TICK);
   }
 
