@@ -418,8 +418,9 @@
         Audio.playClick(isFirstBeat);
       }
 
-      // On first beat: play chord/arpeggio + update diagram
+      // On first beat: update diagram first, then play chord/arpeggio
       if (isFirstBeat) {
+        renderCurrentChord();
         var voicing = state.voicings[state.currentChordIndex];
         if (voicing && state.soundOn) {
           var chordDuration = Math.max((state.beatsPerChord * intervalMs) / 1000, 1.5);
@@ -430,7 +431,6 @@
             Audio.playChord(midi, chordDuration);
           }
         }
-        renderCurrentChord();
       }
 
       // Beat indicator
@@ -797,12 +797,10 @@
     var noteInterval = (totalDurationSec * 1000) / (notes.length + 1);
     var noteDuration = Math.max(totalDurationSec * 0.8, 1.0);
 
-    // Get the current diagram SVG for highlighting
-    var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
-
     notes.forEach(function (note, idx) {
       var tid = setTimeout(function () {
-        // Clear previous highlight, then highlight current string
+        // Find SVG fresh each time (it may have been re-rendered)
+        var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
         if (svg) {
           Diagram.clearDiagramHighlights(svg);
           Diagram.highlightString(svg, note.string);
@@ -814,6 +812,7 @@
 
     // Clear highlights after last note
     var clearTid = setTimeout(function () {
+      var svg = elDiagram ? elDiagram.querySelector('.chord-diagram') : null;
       if (svg) Diagram.clearDiagramHighlights(svg);
     }, notes.length * noteInterval);
     state._arpeggioTimeouts.push(clearTid);
