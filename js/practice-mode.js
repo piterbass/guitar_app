@@ -38,6 +38,8 @@
   let elStringMode, elStringPairInfo;
   let elPathUp, elPathDown, elPathDownRow, elPathInfo;
   let elTransposeAll, elTransposeInfo;
+  let elSubdivision, elSubdivisionInfo;
+  let elIntervalPattern, elIntervalInfo;
 
   // ── State ──
   let practiceState = {
@@ -81,6 +83,8 @@
     _transposeSemitones: 0,  // current transposition offset (0-11)
     _transposeOriginalRootPc: null,
     _transposeOriginalScaleMap: null,
+    subdivision: 1,          // 1=negra, 2=corchea, 3=tresillo, 4=semicorchea, 6=tresillo de corchea
+    intervalPattern: 'none', // 'none' | 'thirds' | 'fourths' | 'fifths' | 'sixths' | 'octaves'
   };
 
   // ── Init ──
@@ -128,6 +132,10 @@
     elPathInfo         = document.getElementById('practice-path-info');
     elTransposeAll     = document.getElementById('practice-transpose-all');
     elTransposeInfo    = document.getElementById('practice-transpose-info');
+    elSubdivision      = document.getElementById('practice-subdivision');
+    elSubdivisionInfo  = document.getElementById('practice-subdivision-info');
+    elIntervalPattern  = document.getElementById('practice-interval-pattern');
+    elIntervalInfo     = document.getElementById('practice-interval-info');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -215,6 +223,16 @@
       if (this.checked) {
         elTransposeInfo.textContent = 'Al terminar la secuencia, transpone +1 semitono y repite (12 tonos)';
       }
+      if (practiceState.playing) { stop(); }
+    });
+    if (elSubdivision) elSubdivision.addEventListener('change', function () {
+      practiceState.subdivision = parseInt(this.value) || 1;
+      updateSubdivisionInfo();
+      if (practiceState.playing) { stop(); }
+    });
+    if (elIntervalPattern) elIntervalPattern.addEventListener('change', function () {
+      practiceState.intervalPattern = this.value;
+      updateIntervalInfo();
       if (practiceState.playing) { stop(); }
     });
 
@@ -735,6 +753,7 @@
     practiceState.progressionChords.forEach(function (chord, i) {
       var chip = document.createElement('span');
       chip.className = 'cp-chord-chip';
+      chip.style.cursor = 'pointer';
       if (i === practiceState.progressionCurrentIdx) chip.classList.add('current');
       else if (i === practiceState.progressionCurrentIdx + 1) chip.classList.add('next');
       // Show transposed chord name if transposing
@@ -748,6 +767,13 @@
         }
       }
       chip.textContent = displayChord;
+      // Click to jump to this chord's scale (when not playing)
+      chip.addEventListener('click', function () {
+        if (practiceState.playing) return;
+        practiceState.progressionCurrentIdx = i;
+        applyProgChordScale(i);
+        renderProgStrip();
+      });
       elProgStrip.appendChild(chip);
     });
   }
@@ -843,7 +869,7 @@
     practiceState.paused = false;
     practiceState._noteIndex = 0;
     Audio.stopAll();
-    FB.clearHighlights();
+    FB.clearHighlights(elFretboard);
     if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
     if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }
     if (elStopBtn) { elStopBtn.disabled = true; elStopBtn.style.opacity = '0.5'; }
@@ -1117,6 +1143,61 @@
     }
   }
 
+  // ── Subdivision & interval pattern helpers ──
+
+  function updateSubdivisionInfo() {
+    if (!elSubdivisionInfo) return;
+    var sub = practiceState.subdivision;
+    if (sub === 1) {
+      elSubdivisionInfo.style.display = 'none';
+      return;
+    }
+    elSubdivisionInfo.style.display = '';
+    var LABELS = { 2: 'Corcheas', 3: 'Tresillos', 4: 'Semicorcheas', 6: 'Tresillos de corchea' };
+    var bpm = practiceState.bpm;
+    var notesPerSec = (bpm / 60) * sub;
+    elSubdivisionInfo.textContent = LABELS[sub] + ': ' + notesPerSec.toFixed(1) + ' notas/seg a ' + bpm + ' BPM';
+  }
+
+  function updateIntervalInfo() {
+    if (!elIntervalInfo) return;
+    var pattern = practiceState.intervalPattern;
+    if (pattern === 'none') {
+      elIntervalInfo.style.display = 'none';
+      return;
+    }
+    elIntervalInfo.style.display = '';
+    var LABELS = {
+      thirds: 'Terceras: salta de a 2 grados (C E D F E G ...)',
+      fourths: 'Cuartas: salta de a 3 grados (C F D G E A ...)',
+      fifths: 'Quintas: salta de a 4 grados (C G D A E B ...)',
+      sixths: 'Sextas: salta de a 5 grados (C A D B E C\' ...)',
+      octaves: 'Octavas: salta de a 7 grados',
+    };
+    elIntervalInfo.textContent = LABELS[pattern] || '';
+  }
+
+  /**
+   * Transforma un array de notas MIDI aplicando un patrón de salto por intervalos.
+   * Para terceras con notas [C,D,E,F,G,A,B]: C,E, D,F, E,G, F,A, G,B, A,C'
+   */
+  function applyIntervalPattern(midiNotes, pattern) {
+    if (pattern === 'none' || !pattern) return midiNotes;
+
+    var JUMPS = { thirds: 2, fourths: 3, fifths: 4, sixths: 5, octaves: 7 };
+    var jump = JUMPS[pattern];
+    if (!jump || midiNotes.length < 2) return midiNotes;
+
+    var result = [];
+    for (var i = 0; i < midiNotes.length; i++) {
+      result.push(midiNotes[i]);
+      if (i + jump < midiNotes.length) {
+        result.push(midiNotes[i + jump]);
+      }
+    }
+    return result;
+  }
+
   // ── Build notes for playback ──
 
   function buildMidiNotes() {
@@ -1146,22 +1227,26 @@
     var pathUp = practiceState.pathUp;
     var pathDown = practiceState.pathDown;
 
+    var midiResult;
     if (practiceState.direction === 'ascending') {
-      return applyPath(notes, pathUp).map(function (n) { return n.midi; });
-    }
-    if (practiceState.direction === 'descending') {
-      return applyPath(notes, pathUp).reverse().map(function (n) { return n.midi; });
-    }
-    if (practiceState.direction === 'both') {
+      midiResult = applyPath(notes, pathUp).map(function (n) { return n.midi; });
+    } else if (practiceState.direction === 'descending') {
+      midiResult = applyPath(notes, pathUp).reverse().map(function (n) { return n.midi; });
+    } else if (practiceState.direction === 'both') {
       // Ascending by pathUp, descending by pathDown (different route!)
       var ascNotes = applyPath(notes, pathUp).map(function (n) { return n.midi; });
       var descNotes = applyPath(notes, pathDown).reverse().map(function (n) { return n.midi; });
       // Remove first note of descending to avoid repeating the top note
       if (descNotes.length > 0) descNotes = descNotes.slice(1);
-      return ascNotes.concat(descNotes);
+      midiResult = ascNotes.concat(descNotes);
+    } else {
+      midiResult = applyPath(notes, pathUp).map(function (n) { return n.midi; });
     }
 
-    return applyPath(notes, pathUp).map(function (n) { return n.midi; });
+    // Apply interval pattern (thirds, fourths, etc.)
+    midiResult = applyIntervalPattern(midiResult, practiceState.intervalPattern);
+
+    return midiResult;
   }
 
   // ── Play / Stop ──
@@ -1274,16 +1359,19 @@
     elStopBtn.disabled = false;
     elStopBtn.style.opacity = '1';
 
-    const intervalMs = 60000 / practiceState.bpm;
-    const noteDuration = Math.max(intervalMs / 1000 + 0.5, 0.8);
+    const beatMs = 60000 / practiceState.bpm;
+    const sub = practiceState.subdivision || 1;
+    const noteIntervalMs = beatMs / sub;
+    const noteDuration = Math.max(noteIntervalMs / 1000 + 0.3, 0.4);
 
-    // Count-in: 4 clicks before starting
+    // Count-in: 4 clicks at beat rate, then switch to note rate
     let countIn = 4;
     let countIdx = 0;
+    let subBeatCounter = 0; // tracks subdivision position within beat
 
+    // Phase 1: Count-in at beat rate
     practiceState._intervalId = setInterval(() => {
       if (countIdx < countIn) {
-        // Count-in phase
         if (practiceState.metronomeOn) {
           Audio.playClick(countIdx === 0);
         }
@@ -1291,13 +1379,19 @@
         countIdx++;
         return;
       }
+      // Count-in done, switch to note-rate interval
+      clearInterval(practiceState._intervalId);
+      subBeatCounter = 0;
+      practiceState._intervalId = setInterval(playTick, noteIntervalMs);
+      playTick(); // play first note immediately
+    }, beatMs);
 
-      // Playing phase
+    function playTick() {
       const idx = practiceState._noteIndex;
       const midi = practiceState._currentNotes[idx];
 
-      // Metronome click
-      if (practiceState.metronomeOn) {
+      // Metronome click on beat boundaries (every `sub` notes)
+      if (practiceState.metronomeOn && subBeatCounter % sub === 0) {
         Audio.playClick(idx === 0);
       }
 
@@ -1305,13 +1399,14 @@
       if (midi !== undefined && practiceState.soundOn) Audio.playNote(midi, noteDuration);
 
       // Highlight on fretboard
-      FB.clearHighlights();
-      if (midi !== undefined) FB.highlightNoteMidi(midi);
+      FB.clearHighlights(elFretboard);
+      if (midi !== undefined) FB.highlightNoteMidi(midi, elFretboard);
 
       // Beat indicator
       updateBeatIndicator(idx, practiceState._currentNotes.length, false);
 
       practiceState._noteIndex++;
+      subBeatCounter++;
 
       if (practiceState._noteIndex >= practiceState._currentNotes.length) {
         // Progression mode: advance to next chord's scale
@@ -1348,7 +1443,7 @@
           }
         }
       }
-    }, intervalMs);
+    }
   }
 
   function pause() {
@@ -1361,7 +1456,7 @@
     practiceState.paused = true;
 
     Audio.stopAll();
-    FB.clearHighlights();
+    FB.clearHighlights(elFretboard);
 
     if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
     if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }
@@ -1401,7 +1496,7 @@
     }
 
     Audio.stopAll();
-    FB.clearHighlights();
+    FB.clearHighlights(elFretboard);
 
     if (elPlayBtn) { elPlayBtn.disabled = false; elPlayBtn.style.opacity = '1'; }
     if (elPauseBtn) { elPauseBtn.disabled = true; elPauseBtn.style.opacity = '0.5'; }

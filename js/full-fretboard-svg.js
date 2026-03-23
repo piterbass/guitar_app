@@ -312,10 +312,13 @@
 
   /**
    * Resalta una nota por MIDI value (para playback sync).
+   * @param {number} midi - MIDI note number
+   * @param {Element} [container] - optional container element to search within
    */
-  function highlightNoteMidi(midi) {
-    if (!currentSvg) return;
-    const dots = currentSvg.querySelectorAll('.fb-note[data-midi="' + midi + '"]');
+  function highlightNoteMidi(midi, container) {
+    var svg = container ? container.querySelector('svg') : currentSvg;
+    if (!svg) return;
+    const dots = svg.querySelectorAll('.fb-note[data-midi="' + midi + '"]');
     dots.forEach(dot => {
       dot.setAttribute('data-orig-fill', dot.getAttribute('fill'));
       dot.setAttribute('data-orig-r', dot.getAttribute('r'));
@@ -328,10 +331,12 @@
 
   /**
    * Limpia todos los highlights de playback.
+   * @param {Element} [container] - optional container element to search within
    */
-  function clearHighlights() {
-    if (!currentSvg) return;
-    const highlighted = currentSvg.querySelectorAll('.fb-note[data-orig-fill]');
+  function clearHighlights(container) {
+    var svg = container ? container.querySelector('svg') : currentSvg;
+    if (!svg) return;
+    const highlighted = svg.querySelectorAll('.fb-note[data-orig-fill]');
     highlighted.forEach(dot => {
       dot.setAttribute('fill', dot.getAttribute('data-orig-fill'));
       dot.setAttribute('r', dot.getAttribute('data-orig-r'));

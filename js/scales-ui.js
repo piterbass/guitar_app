@@ -342,15 +342,18 @@
     if (midiNotes.length === 0) return;
 
     elPlayPosition.innerHTML = '&#9724; Stop';
+    var totalNotes = midiNotes.length;
     state.playback = window.AudioEngine.playScale(midiNotes, state.tempo, function (noteIdx) {
-      FB.clearHighlights();
+      FB.clearHighlights(elFretboard);
       if (noteIdx >= 0 && noteIdx < midiNotes.length) {
-        FB.highlightNoteMidi(midiNotes[noteIdx]);
+        FB.highlightNoteMidi(midiNotes[noteIdx], elFretboard);
+        updateExploreBeatIndicator(noteIdx, totalNotes);
       }
       if (noteIdx === -1) {
         state.playback = null;
         elPlayPosition.innerHTML = '&#9654; Posición';
-        FB.clearHighlights();
+        FB.clearHighlights(elFretboard);
+        clearExploreBeatIndicator();
       }
     });
   }
@@ -362,17 +365,34 @@
     if (midiNotes.length === 0) return;
 
     elPlayFull.innerHTML = '&#9724; Stop';
+    var totalNotes = midiNotes.length;
     state.playback = window.AudioEngine.playScale(midiNotes, state.tempo, function (noteIdx) {
-      FB.clearHighlights();
+      FB.clearHighlights(elFretboard);
       if (noteIdx >= 0 && noteIdx < midiNotes.length) {
-        FB.highlightNoteMidi(midiNotes[noteIdx]);
+        FB.highlightNoteMidi(midiNotes[noteIdx], elFretboard);
+        updateExploreBeatIndicator(noteIdx, totalNotes);
       }
       if (noteIdx === -1) {
         state.playback = null;
         elPlayFull.innerHTML = '&#9654; Escala';
-        FB.clearHighlights();
+        FB.clearHighlights(elFretboard);
+        clearExploreBeatIndicator();
       }
     });
+  }
+
+  function updateExploreBeatIndicator(current, total) {
+    var el = document.getElementById('scales-beat-indicator');
+    if (!el) return;
+    var pct = total > 1 ? Math.round((current / (total - 1)) * 100) : 100;
+    el.innerHTML =
+      '<div class="beat-progress-bar"><div class="beat-progress-fill" style="width:' + pct + '%"></div></div>' +
+      '<span class="beat-note-count">' + (current + 1) + ' / ' + total + '</span>';
+  }
+
+  function clearExploreBeatIndicator() {
+    var el = document.getElementById('scales-beat-indicator');
+    if (el) el.innerHTML = '';
   }
 
   function stopPlayback() {
@@ -383,7 +403,8 @@
     window.AudioEngine.stopAll();
     elPlayPosition.innerHTML = '&#9654; Posición';
     elPlayFull.innerHTML = '&#9654; Escala';
-    FB.clearHighlights();
+    FB.clearHighlights(elFretboard);
+    clearExploreBeatIndicator();
   }
 
   // ── Keyboard ──────────────────────────────────────────────
