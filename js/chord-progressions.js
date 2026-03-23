@@ -463,6 +463,10 @@
 
   // ── Sugerencia de escala para un acorde ─────────────────────
 
+  /**
+   * Sugiere una escala para un acorde individual (sin contexto de progresión).
+   * Para sugerencias contextuales, usar suggestScalesForChords().
+   */
   function suggestScale(chordName) {
     var parsed = window.ChordParser.parseChord(chordName);
     if (!parsed) return { rootPc: 0, scaleKey: 'major' };
@@ -477,6 +481,20 @@
 
     var scaleKey = qualMap.recommended[0] || 'major';
     return { rootPc: parsed.rootPc, scaleKey: scaleKey };
+  }
+
+  /**
+   * Sugiere escalas para todos los acordes de una progresión usando análisis armónico contextual.
+   * Detecta la tonalidad, asigna grados y funciones, y recomienda el modo diatónico correcto.
+   *
+   * @param {string[]} chordNames - ["Gm7", "Cm7", "F7"]
+   * @returns {{ key, chordScales: Array<{rootPc, scaleKey, degree, func}> } | null}
+   */
+  function suggestScalesForChords(chordNames) {
+    if (!window.HarmonicContext || !window.HarmonicContext.suggestScalesForProgression) {
+      return null;
+    }
+    return window.HarmonicContext.suggestScalesForProgression(chordNames);
   }
 
   // ── Obtener toda la biblioteca (incluye ciclos) ─────────────
@@ -497,5 +515,6 @@
     getAll: getAll,
     getByCategory: getByCategory,
     suggestScale: suggestScale,
+    suggestScalesForChords: suggestScalesForChords,
   };
 })();

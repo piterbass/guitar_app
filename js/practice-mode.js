@@ -40,6 +40,7 @@
   let elTransposeAll, elTransposeInfo;
   let elSubdivision, elSubdivisionInfo;
   let elIntervalPattern, elIntervalInfo;
+  let elAnalysisToggle, elAnalysisPanel;
 
   // ── State ──
   let practiceState = {
@@ -85,6 +86,7 @@
     _transposeOriginalScaleMap: null,
     subdivision: 1,          // 1=negra, 2=corchea, 3=tresillo, 4=semicorchea, 6=tresillo de corchea
     intervalPattern: 'none', // 'none' | 'thirds' | 'fourths' | 'fifths' | 'sixths' | 'octaves'
+    _harmonicAnalysis: null, // resultado de suggestScalesForProgression
   };
 
   // ── Init ──
@@ -136,6 +138,8 @@
     elSubdivisionInfo  = document.getElementById('practice-subdivision-info');
     elIntervalPattern  = document.getElementById('practice-interval-pattern');
     elIntervalInfo     = document.getElementById('practice-interval-info');
+    elAnalysisToggle   = document.getElementById('practice-analysis-toggle');
+    elAnalysisPanel    = document.getElementById('practice-analysis-panel');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -154,6 +158,7 @@
     });
     if (elProgSelect) elProgSelect.addEventListener('change', onProgSelected);
     if (elProgEditorToggle) elProgEditorToggle.addEventListener('click', toggleScaleEditor);
+    if (elAnalysisToggle) elAnalysisToggle.addEventListener('click', toggleAnalysisPanel);
     elPositionSelect.addEventListener('change', onPositionChanged);
     elDirection.addEventListener('change', () => {
       practiceState.direction = elDirection.value;
@@ -401,6 +406,9 @@
       if (elProgInfo) elProgInfo.textContent = '';
       if (elProgScaleEditor) elProgScaleEditor.style.display = 'none';
       if (elProgEditorToggle) elProgEditorToggle.style.display = 'none';
+      if (elAnalysisPanel) elAnalysisPanel.style.display = 'none';
+      if (elAnalysisToggle) elAnalysisToggle.style.display = 'none';
+      practiceState._harmonicAnalysis = null;
       return;
     }
 
@@ -431,14 +439,26 @@
     practiceState.progressionCurrentIdx = 0;
     practiceState.progressionNotesPlayed = 0;
 
-    // Build scale map: load saved or auto-suggest
+    // Build scale map: load saved, or use contextual analysis, or fallback
     var saved = loadSavedScaleMap(id);
     if (saved && saved.length === chords.length) {
       practiceState.progressionScaleMap = saved;
     } else {
-      practiceState.progressionScaleMap = chords.map(function (ch) {
-        return window.ChordProgressions.suggestScale(ch);
-      });
+      // Intentar análisis armónico contextual
+      var contextual = window.ChordProgressions.suggestScalesForChords
+        ? window.ChordProgressions.suggestScalesForChords(chords)
+        : null;
+      if (contextual && contextual.chordScales) {
+        practiceState.progressionScaleMap = contextual.chordScales.map(function (cs) {
+          return { rootPc: cs.rootPc, scaleKey: cs.scaleKey };
+        });
+        practiceState._harmonicAnalysis = contextual;
+      } else {
+        practiceState.progressionScaleMap = chords.map(function (ch) {
+          return window.ChordProgressions.suggestScale(ch);
+        });
+        practiceState._harmonicAnalysis = null;
+      }
     }
 
     // Apply first chord
@@ -447,6 +467,7 @@
     // Render
     renderProgStrip();
     renderScaleEditor();
+    renderAnalysisPanel();
     if (elProgStrip) elProgStrip.style.display = '';
     if (elProgEditorToggle) elProgEditorToggle.style.display = '';
   }
@@ -497,12 +518,81 @@
       posInfo = pos ? ' [' + pos.label + ']' : '';
     }
     if (elProgInfo) {
-      elProgInfo.textContent = chordName + ' → ' + rootName + ' ' + scaleName + posInfo;
+      var infoText = chordName + ' → ' + rootName + ' ' + scaleName + posInfo;
+      // Mostrar grado y función si hay análisis armónico
+      var analysis = practiceState._harmonicAnalysis;
+      if (analysis && analysis.chordScales && analysis.chordScales[chordIdx]) {
+        var cs = analysis.chordScales[chordIdx];
+        if (cs.degree && cs.degree !== '?') {
+          var funcLabels = { tonica: 'T', subdominante: 'SD', dominante: 'D', modal: 'Mod', secundario: 'Sec' };
+          infoText += '  (' + cs.degree + ' · ' + (funcLabels[cs.func] || cs.func) + ')';
+        }
+      }
+      if (analysis && analysis.key) {
+        infoText += '  [Tono: ' + analysis.key.rootName + (analysis.key.mode === 'minor' ? 'm' : '') + ']';
+      }
+      elProgInfo.textContent = infoText;
     }
 
     // Calculate how many notes per chord
     var notes = buildMidiNotes();
     practiceState.progressionNotesPerChord = notes.length;
+  }
+
+  // ── Harmonic analysis panel ──
+
+  function toggleAnalysisPanel() {
+    if (!elAnalysisPanel) return;
+    var visible = elAnalysisPanel.style.display !== 'none';
+    elAnalysisPanel.style.display = visible ? 'none' : '';
+    if (elAnalysisToggle) {
+      elAnalysisToggle.innerHTML = (visible ? '&#9656;' : '&#9662;') + ' Análisis armónico';
+    }
+  }
+
+  function renderAnalysisPanel() {
+    if (!elAnalysisPanel || !elAnalysisToggle) return;
+    var analysis = practiceState._harmonicAnalysis;
+
+    if (!analysis || !analysis.key) {
+      elAnalysisToggle.style.display = 'none';
+      elAnalysisPanel.style.display = 'none';
+      return;
+    }
+
+    elAnalysisToggle.style.display = '';
+    elAnalysisPanel.className = 'harmonic-analysis-panel';
+
+    var SCALE_LABELS = window.ScaleDetector.SCALE_LABELS;
+    var funcLabels = {
+      tonica: 'Tónica', subdominante: 'Subdominante',
+      dominante: 'Dominante', modal: 'Modal', secundario: 'Dominante sec.',
+    };
+
+    var html = '<div class="ha-key">Tonalidad detectada: ' +
+      analysis.key.rootName + (analysis.key.mode === 'minor' ? ' menor' : ' mayor') +
+      '</div>';
+
+    html += '<table><thead><tr><th>Acorde</th><th>Grado</th><th>Función</th><th>Escala sugerida</th></tr></thead><tbody>';
+
+    var chords = practiceState.progressionChords;
+    for (var i = 0; i < chords.length; i++) {
+      var cs = analysis.chordScales[i];
+      if (!cs) continue;
+      var funcClass = 'ha-func-' + (cs.func || 'tonica');
+      var scaleLabel = SCALE_LABELS[cs.scaleKey] || cs.scaleKey;
+      var rootName = window.MusicTheory.pcToName(cs.rootPc);
+
+      html += '<tr>' +
+        '<td><strong>' + chords[i] + '</strong></td>' +
+        '<td class="ha-degree">' + (cs.degree || '?') + '</td>' +
+        '<td class="' + funcClass + '">' + (funcLabels[cs.func] || cs.func) + '</td>' +
+        '<td>' + rootName + ' ' + scaleLabel + '</td>' +
+        '</tr>';
+    }
+
+    html += '</tbody></table>';
+    elAnalysisPanel.innerHTML = html;
   }
 
   // ── Scale editor UI ──
@@ -766,7 +856,13 @@
           displayChord = newRoot + chord.replace(/^[A-G][#b]?/, '');
         }
       }
-      chip.textContent = displayChord;
+      // Mostrar grado diatónico debajo del acorde si hay análisis
+      var analysis = practiceState._harmonicAnalysis;
+      if (analysis && analysis.chordScales && analysis.chordScales[i] && analysis.chordScales[i].degree !== '?') {
+        chip.innerHTML = displayChord + '<br><small style="font-size:0.65em;opacity:0.7;">' + analysis.chordScales[i].degree + '</small>';
+      } else {
+        chip.textContent = displayChord;
+      }
       // Click to jump to this chord's scale (when not playing)
       chip.addEventListener('click', function () {
         if (practiceState.playing) return;
