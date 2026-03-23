@@ -52,6 +52,8 @@
       document.getElementById('nav-songs').classList.add('active');
     } else if (sectionName === 'analyzer') {
       document.getElementById('nav-analyzer').classList.add('active');
+    } else if (sectionName === 'harmonic') {
+      document.getElementById('nav-harmonic').classList.add('active');
     }
   }
 
@@ -170,6 +172,10 @@
       showSection('songs');
     });
     document.getElementById('nav-analyzer').addEventListener('click', () => showSection('analyzer'));
+    document.getElementById('nav-harmonic').addEventListener('click', () => {
+      if (window.HarmonicAnalysisUI) window.HarmonicAnalysisUI.init();
+      showSection('harmonic');
+    });
 
     // Init Chord Analyzer
     if (window.ChordAnalyzerUI) window.ChordAnalyzerUI.init();
