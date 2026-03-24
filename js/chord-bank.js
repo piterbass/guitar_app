@@ -88,11 +88,47 @@
     _persist(bank);
   }
 
+  /** Elimina todos los voicings de un acorde. */
+  function removeAll(name) {
+    const bank = _load();
+    if (!bank[name]) return;
+    delete bank[name];
+    _persist(bank);
+  }
+
+  /** Renombra un acorde (mueve todos sus voicings al nuevo nombre). */
+  function rename(oldName, newName) {
+    const bank = _load();
+    if (!bank[oldName] || !newName.trim()) return false;
+    newName = newName.trim();
+    if (oldName === newName) return false;
+    // Mergear si el nuevo nombre ya existe
+    if (!bank[newName]) bank[newName] = [];
+    bank[oldName].forEach(v => {
+      const key = v.frets.join(',');
+      const exists = bank[newName].some(e => e.frets.join(',') === key);
+      if (!exists) bank[newName].push(v);
+    });
+    delete bank[oldName];
+    _persist(bank);
+    return true;
+  }
+
+  /** Actualiza los frets de un voicing específico. */
+  function updateFrets(name, index, newFrets) {
+    const bank = _load();
+    if (!bank[name] || !bank[name][index]) return false;
+    bank[name][index].frets = [...newFrets];
+    bank[name][index].label = newFrets.map(f => f === -1 ? 'x' : f).join('-');
+    _persist(bank);
+    return true;
+  }
+
   /** Cuenta total de voicings guardados. */
   function count() {
     const bank = _load();
     return Object.values(bank).reduce((sum, arr) => sum + arr.length, 0);
   }
 
-  window.ChordBank = { getAll, getByName, save, remove, exportJSON, importJSON, count };
+  window.ChordBank = { getAll, getByName, save, remove, removeAll, rename, updateFrets, exportJSON, importJSON, count };
 })();

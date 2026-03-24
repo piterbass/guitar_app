@@ -12,9 +12,12 @@
   var Engine = window.ScalePositionEngine
   var SCALE_LABELS = window.ScaleDetector.SCALE_LABELS
 
+  var PROG_SCALES_KEY = 'practice-prog-scale-maps'
+
   // DOM refs
   var elSourceType, elSourceSelect, elManualInput, elChordInput, elAnalyzeBtn
   var elResult, elKeyDisplay, elAnalysisTable, elFretboard, elFretboardInfo
+  var elPosNav, elPrevPos, elNextPos, elPosDots, elPosLabel
 
   // State
   var state = {
@@ -22,6 +25,10 @@
     chords: [],
     analysis: null,
     selectedChordIdx: -1,
+    positions: [],
+    currentPosIdx: 0,
+    currentCs: null,
+    currentScalePCs: null,
   }
 
   function init() {
@@ -38,6 +45,11 @@
     elAnalysisTable = document.getElementById('ha-analysis-table')
     elFretboard = document.getElementById('ha-fretboard')
     elFretboardInfo = document.getElementById('ha-fretboard-info')
+    elPosNav = document.getElementById('ha-position-nav')
+    elPrevPos = document.getElementById('ha-prev-pos')
+    elNextPos = document.getElementById('ha-next-pos')
+    elPosDots = document.getElementById('ha-position-dots')
+    elPosLabel = document.getElementById('ha-position-label')
 
     if (!elSourceType) return
 
@@ -49,8 +61,21 @@
       if (e.key === 'Enter') onManualAnalyze()
     })
 
+    // Position nav events
+    if (elPrevPos) elPrevPos.addEventListener('click', function () { navigatePosition(-1) })
+    if (elNextPos) elNextPos.addEventListener('click', function () { navigatePosition(1) })
+
     // Populate initial source
     onSourceTypeChanged()
+  }
+
+  // ── Load saved scale map from practice mode ──
+
+  function loadSavedScaleMap(progId) {
+    try {
+      var all = JSON.parse(localStorage.getItem(PROG_SCALES_KEY)) || {}
+      return all[progId] || null
+    } catch (e) { return null }
   }
 
   // ── Source selection ──
@@ -107,7 +132,11 @@
       if (chords[i] !== chords[i - 1]) unique.push(chords[i])
     }
 
-    analyzeChords(unique)
+    // Load saved scale map (from practice mode's "Configurar escalas")
+    var progId = opt.value
+    var savedMap = loadSavedScaleMap(progId)
+
+    analyzeChords(unique, savedMap)
   }
 
   function onManualAnalyze() {
@@ -116,12 +145,12 @@
     // Split by spaces, commas, pipes, dashes
     var chords = text.split(/[\s,|–\-]+/).filter(function (c) { return c.length > 0 })
     if (chords.length === 0) return
-    analyzeChords(chords)
+    analyzeChords(chords, null)
   }
 
   // ── Core analysis ──
 
-  function analyzeChords(chords) {
+  function analyzeChords(chords, savedScaleMap) {
     state.chords = chords
     state.selectedChordIdx = 0
 
@@ -130,6 +159,25 @@
       state.analysis = HC.suggestScalesForProgression(chords)
     } else {
       state.analysis = null
+    }
+
+    // Apply saved scale overrides from practice mode configuration
+    if (state.analysis && state.analysis.chordScales && savedScaleMap &&
+        savedScaleMap.length === chords.length) {
+      var hasOverrides = false
+      for (var i = 0; i < chords.length; i++) {
+        var saved = savedScaleMap[i]
+        var cs = state.analysis.chordScales[i]
+        if (!saved || !cs) continue
+        // Only override if different from the auto-analysis
+        if (saved.rootPc !== cs.rootPc || saved.scaleKey !== cs.scaleKey) {
+          cs.rootPc = saved.rootPc
+          cs.scaleKey = saved.scaleKey
+          cs.customScale = true
+          hasOverrides = true
+        }
+      }
+      state.analysis.hasCustomScales = hasOverrides
     }
 
     renderKeyDisplay()
@@ -157,8 +205,12 @@
     var scalePCs = MT.getScalePCs(key.rootPc, scaleKey)
     var noteNames = scalePCs.map(function (pc) { return MT.pcToName(pc) }).join(' – ')
 
+    var customBadge = analysis.hasCustomScales
+      ? '<span class="ha-custom-badge" title="Algunas escalas usan la configuración del modo práctica">escalas personalizadas</span>'
+      : ''
+
     elKeyDisplay.innerHTML =
-      '<div class="ha-key-name">' + keyLabel + '</div>' +
+      '<div class="ha-key-name">' + keyLabel + customBadge + '</div>' +
       '<div class="ha-key-notes">Notas: ' + noteNames + '</div>'
   }
 
@@ -184,8 +236,9 @@
     for (var i = 0; i < chords.length; i++) {
       var cs = analysis.chordScales[i]
       var activeClass = i === state.selectedChordIdx ? ' active' : ''
+      var customClass = cs && cs.customScale ? ' ha-custom' : ''
       var degreeLabel = cs && cs.degree !== '?' ? cs.degree : ''
-      chipsHtml += '<span class="ha-chord-chip' + activeClass + '" data-idx="' + i + '">' +
+      chipsHtml += '<span class="ha-chord-chip' + activeClass + customClass + '" data-idx="' + i + '">' +
         chords[i] +
         (degreeLabel ? '<span class="ha-chip-degree">' + degreeLabel + '</span>' : '') +
         '</span>'
@@ -202,13 +255,13 @@
       var funcClass = 'ha-func-' + (cs.func || 'tonica')
       var scaleLabel = SCALE_LABELS[cs.scaleKey] || cs.scaleKey
       var rootName = MT.pcToName(cs.rootPc)
-      var rowClass = i === state.selectedChordIdx ? ' style="background:#1a2540;"' : ''
+      var customIcon = cs.customScale ? ' <span class="ha-custom-icon" title="Escala personalizada (modo práctica)">&#9734;</span>' : ''
 
-      html += '<tr' + rowClass + ' data-idx="' + i + '" style="cursor:pointer;' + (i === state.selectedChordIdx ? 'background:#1a2540;' : '') + '">' +
+      html += '<tr data-idx="' + i + '" style="cursor:pointer;' + (i === state.selectedChordIdx ? 'background:#1a2540;' : '') + '">' +
         '<td><strong>' + chords[i] + '</strong></td>' +
         '<td class="ha-degree">' + (cs.degree || '?') + '</td>' +
         '<td class="' + funcClass + '">' + (funcLabels[cs.func] || cs.func) + '</td>' +
-        '<td>' + rootName + ' ' + scaleLabel + '</td>' +
+        '<td>' + rootName + ' ' + scaleLabel + customIcon + '</td>' +
         '</tr>'
     }
 
@@ -230,6 +283,70 @@
     })
   }
 
+  // ── Position navigation ──
+
+  function navigatePosition(delta) {
+    var newIdx = state.currentPosIdx + delta
+    if (newIdx < 0 || newIdx >= state.positions.length) return
+    state.currentPosIdx = newIdx
+    renderFretboardPosition()
+    updatePositionNav()
+  }
+
+  function updatePositionNav() {
+    if (!elPosNav) return
+    var positions = state.positions
+
+    if (positions.length <= 1) {
+      elPosNav.style.display = 'none'
+      return
+    }
+
+    elPosNav.style.display = ''
+    var idx = state.currentPosIdx
+
+    // Label
+    if (elPosLabel) {
+      elPosLabel.textContent = positions[idx].label + ' (' + (idx + 1) + '/' + positions.length + ')'
+    }
+
+    // Arrows
+    if (elPrevPos) elPrevPos.disabled = idx === 0
+    if (elNextPos) elNextPos.disabled = idx === positions.length - 1
+
+    // Dots
+    if (elPosDots) {
+      elPosDots.innerHTML = ''
+      positions.forEach(function (p, pi) {
+        var dot = document.createElement('span')
+        dot.className = 'position-dot' + (pi === idx ? ' active' : '')
+        dot.title = p.label
+        dot.style.cursor = 'pointer'
+        dot.addEventListener('click', function () {
+          state.currentPosIdx = pi
+          renderFretboardPosition()
+          updatePositionNav()
+        })
+        elPosDots.appendChild(dot)
+      })
+    }
+  }
+
+  function renderFretboardPosition() {
+    if (!elFretboard || !state.positions[state.currentPosIdx]) return
+    elFretboard.innerHTML = ''
+    var pos = state.positions[state.currentPosIdx]
+    var svg = FB.createFullFretboard({
+      rootPc: state.currentCs.rootPc,
+      scalePCs: state.currentScalePCs,
+      positionNotes: pos.noteData,
+      fretRange: pos.fretRange,
+      showFullScale: true,
+      showIntervals: true,
+    })
+    elFretboard.appendChild(svg)
+  }
+
   // ── Select chord and show fretboard ──
 
   function selectChord(idx) {
@@ -243,6 +360,12 @@
     var scalePCs = MT.getScalePCs(cs.rootPc, cs.scaleKey)
     var positions = Engine.generatePositions(cs.rootPc, cs.scaleKey)
 
+    // Save to state for position nav
+    state.currentCs = cs
+    state.currentScalePCs = scalePCs
+    state.positions = positions
+    state.currentPosIdx = 0
+
     // Show info
     var scaleLabel = SCALE_LABELS[cs.scaleKey] || cs.scaleKey
     var rootName = MT.pcToName(cs.rootPc)
@@ -250,66 +373,20 @@
       tonica: 'Tónica', subdominante: 'Subdominante',
       dominante: 'Dominante', modal: 'Modal', secundario: 'Dom. secundario',
     }
+    var customTag = cs.customScale ? ' [personalizada]' : ''
     if (elFretboardInfo) {
       elFretboardInfo.textContent = state.chords[idx] + ' → ' + rootName + ' ' + scaleLabel +
-        ' (' + (cs.degree || '') + ' · ' + (funcLabels[cs.func] || '') + ')'
+        ' (' + (cs.degree || '') + ' · ' + (funcLabels[cs.func] || '') + ')' + customTag
     }
 
-    // Render fretboard with first position
+    // Render fretboard and position nav
     if (elFretboard && positions.length > 0) {
-      elFretboard.innerHTML = ''
-      var pos = positions[0]
-      var svg = FB.createFullFretboard({
-        rootPc: cs.rootPc,
-        scalePCs: scalePCs,
-        positionNotes: pos.noteData,
-        fretRange: pos.fretRange,
-        showFullScale: true,
-        showIntervals: true,
-      })
-      elFretboard.appendChild(svg)
-
-      // Add position dots for navigation
-      if (positions.length > 1) {
-        var dotsDiv = document.createElement('div')
-        dotsDiv.style.cssText = 'text-align:center; margin-top:6px;'
-        positions.forEach(function (p, pi) {
-          var dot = document.createElement('span')
-          dot.className = 'position-dot' + (pi === 0 ? ' active' : '')
-          dot.title = p.label
-          dot.style.cursor = 'pointer'
-          dot.addEventListener('click', function () {
-            renderPosition(cs, scalePCs, positions, pi)
-            dotsDiv.querySelectorAll('.position-dot').forEach(function (d, di) {
-              d.classList.toggle('active', di === pi)
-            })
-          })
-          dotsDiv.appendChild(dot)
-        })
-        elFretboard.appendChild(dotsDiv)
-      }
+      renderFretboardPosition()
+      updatePositionNav()
     }
 
     // Update chip/row selection visuals
     renderAnalysisTable()
-  }
-
-  function renderPosition(cs, scalePCs, positions, posIdx) {
-    if (!elFretboard || !positions[posIdx]) return
-    // Keep dots div
-    var dotsDiv = elFretboard.querySelector('div')
-    elFretboard.innerHTML = ''
-    var pos = positions[posIdx]
-    var svg = FB.createFullFretboard({
-      rootPc: cs.rootPc,
-      scalePCs: scalePCs,
-      positionNotes: pos.noteData,
-      fretRange: pos.fretRange,
-      showFullScale: true,
-      showIntervals: true,
-    })
-    elFretboard.appendChild(svg)
-    if (dotsDiv) elFretboard.appendChild(dotsDiv)
   }
 
   // Init on first nav click (lazy)

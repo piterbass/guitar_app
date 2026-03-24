@@ -617,7 +617,41 @@
     names.forEach(name => {
       const header = document.createElement('div');
       header.className = 'bank-group-header';
-      header.textContent = name;
+
+      const headerLabel = document.createElement('span');
+      headerLabel.textContent = name;
+      header.appendChild(headerLabel);
+
+      const headerActions = document.createElement('span');
+      headerActions.className = 'bank-header-actions';
+
+      // Botón editar nombre
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-bank-header';
+      editBtn.title = 'Editar acorde';
+      editBtn.innerHTML = '&#9998;'; // ✎
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openBankEditModal(name);
+      });
+      headerActions.appendChild(editBtn);
+
+      // Botón eliminar todo el acorde
+      const delAllBtn = document.createElement('button');
+      delAllBtn.className = 'btn-bank-header btn-bank-delete';
+      delAllBtn.title = 'Eliminar acorde completo';
+      delAllBtn.innerHTML = '&#128465;'; // 🗑
+      delAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('¿Eliminar "' + name + '" y todos sus voicings?')) {
+          Bank.removeAll(name);
+          updateBankCount();
+          renderBankView();
+        }
+      });
+      headerActions.appendChild(delAllBtn);
+
+      header.appendChild(headerActions);
       elGrid.appendChild(header);
 
       all[name].forEach((sv, idx) => {
@@ -630,6 +664,149 @@
 
     elInfo.innerHTML = `<strong>Mis Acordes</strong> &mdash; ${total} voicing${total !== 1 ? 's' : ''} en ${names.length} acorde${names.length !== 1 ? 's' : ''}${query ? ' (filtrado)' : ''}`;
   }
+
+  // ── Modal editar acorde del banco ──────────────────────────
+
+  function openBankEditModal(chordName) {
+    var modal = document.getElementById('bank-edit-modal');
+    if (!modal) return;
+
+    var nameInput = document.getElementById('bank-edit-name');
+    var voicingsList = document.getElementById('bank-edit-voicings');
+    var title = document.getElementById('bank-edit-title');
+
+    if (title) title.textContent = 'Editar: ' + chordName;
+    if (nameInput) nameInput.value = chordName;
+
+    // Renderizar lista de voicings editables
+    var all = Bank.getAll();
+    var voicings = all[chordName] || [];
+    voicingsList.innerHTML = '';
+
+    voicings.forEach(function (sv, idx) {
+      var row = document.createElement('div');
+      row.className = 'bank-edit-voicing-row';
+
+      var strings = ['E', 'A', 'D', 'G', 'B', 'e'];
+      var inputs = [];
+      strings.forEach(function (s, si) {
+        var wrap = document.createElement('div');
+        wrap.className = 'bank-edit-fret-wrap';
+        var lbl = document.createElement('div');
+        lbl.className = 'string-label';
+        lbl.textContent = s;
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.maxLength = 2;
+        inp.className = 'bank-edit-fret';
+        inp.value = sv.frets[si] === -1 ? 'x' : sv.frets[si];
+        inputs.push(inp);
+        wrap.appendChild(lbl);
+        wrap.appendChild(inp);
+        row.appendChild(wrap);
+      });
+
+      // Preview SVG mini
+      var preview = document.createElement('div');
+      preview.className = 'bank-edit-preview';
+      var voicing = bankEntryToVoicing(sv);
+      var svg = createDiagram(voicing, chordName);
+      preview.appendChild(svg);
+      row.appendChild(preview);
+
+      // Botón eliminar voicing individual
+      var delBtn = document.createElement('button');
+      delBtn.className = 'btn-bank-header btn-bank-delete';
+      delBtn.title = 'Eliminar voicing';
+      delBtn.innerHTML = '&#10005;';
+      delBtn.addEventListener('click', function () {
+        Bank.remove(chordName, idx);
+        updateBankCount();
+        // Refresh: si era el último voicing, cerrar modal
+        var remaining = Bank.getByName(chordName);
+        if (remaining.length === 0) {
+          closeBankEditModal();
+          renderBankView();
+        } else {
+          openBankEditModal(chordName); // re-render
+        }
+      });
+      row.appendChild(delBtn);
+
+      // Guardar referencia de inputs para el save
+      row._fretInputs = inputs;
+      row._index = idx;
+      voicingsList.appendChild(row);
+    });
+
+    // Guardar estado para el save handler
+    modal._chordName = chordName;
+    modal.style.display = 'flex';
+  }
+
+  function closeBankEditModal() {
+    var modal = document.getElementById('bank-edit-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function saveBankEdit() {
+    var modal = document.getElementById('bank-edit-modal');
+    if (!modal) return;
+
+    var oldName = modal._chordName;
+    var newName = document.getElementById('bank-edit-name').value.trim();
+    if (!newName) return;
+
+    // Actualizar frets de cada voicing
+    var rows = document.querySelectorAll('#bank-edit-voicings .bank-edit-voicing-row');
+    rows.forEach(function (row) {
+      var inputs = row._fretInputs;
+      var idx = row._index;
+      var newFrets = [];
+      var valid = true;
+      inputs.forEach(function (inp) {
+        var val = inp.value.trim().toLowerCase();
+        if (val === 'x' || val === '') {
+          newFrets.push(-1);
+        } else {
+          var n = parseInt(val, 10);
+          if (isNaN(n) || n < 0 || n > 24) {
+            inp.style.borderColor = '#e94560';
+            valid = false;
+          } else {
+            newFrets.push(n);
+          }
+        }
+      });
+      if (valid && newFrets.length === 6) {
+        Bank.updateFrets(oldName, idx, newFrets);
+      }
+    });
+
+    // Renombrar si cambió el nombre
+    if (newName !== oldName) {
+      Bank.rename(oldName, newName);
+    }
+
+    updateBankCount();
+    renderBankView();
+    closeBankEditModal();
+  }
+
+  // Inicializar eventos del modal editar banco
+  document.addEventListener('DOMContentLoaded', function () {
+    var closeBtn = document.getElementById('bank-edit-close');
+    var saveBtn = document.getElementById('bank-edit-save');
+    var cancelBtn = document.getElementById('bank-edit-cancel');
+    var modal = document.getElementById('bank-edit-modal');
+
+    if (closeBtn) closeBtn.addEventListener('click', closeBankEditModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeBankEditModal);
+    if (saveBtn) saveBtn.addEventListener('click', saveBankEdit);
+    if (modal) modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeBankEditModal();
+    });
+  });
 
   // ── Modal de diagrama expandido ────────────────────────────
 
