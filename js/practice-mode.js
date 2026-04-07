@@ -41,6 +41,7 @@
   let elSubdivision, elSubdivisionInfo;
   let elIntervalPattern, elIntervalInfo;
   let elAnalysisToggle, elAnalysisPanel;
+  let elPositionClimb, elPositionClimbInfo;
 
   // ── State ──
   let practiceState = {
@@ -87,6 +88,11 @@
     subdivision: 1,          // 1=negra, 2=corchea, 3=tresillo, 4=semicorchea, 6=tresillo de corchea
     intervalPattern: 'none', // 'none' | 'thirds' | 'fourths' | 'fifths' | 'sixths' | 'octaves'
     _harmonicAnalysis: null, // resultado de suggestScalesForProgression
+    // Position climb mode
+    positionClimb: false,
+    _climbCurrentIdx: 0,       // current position index during climb
+    _climbDirection: 'up',     // 'up' or 'down'
+    _climbOriginalPosition: 0, // position selected before climb started
   };
 
   // ── Init ──
@@ -140,6 +146,8 @@
     elIntervalInfo     = document.getElementById('practice-interval-info');
     elAnalysisToggle   = document.getElementById('practice-analysis-toggle');
     elAnalysisPanel    = document.getElementById('practice-analysis-panel');
+    elPositionClimb    = document.getElementById('practice-position-climb');
+    elPositionClimbInfo = document.getElementById('practice-position-climb-info');
 
     if (!elRootSelect || !elTypeSelect) return;
 
@@ -238,6 +246,11 @@
     if (elIntervalPattern) elIntervalPattern.addEventListener('change', function () {
       practiceState.intervalPattern = this.value;
       updateIntervalInfo();
+      if (practiceState.playing) { stop(); }
+    });
+    if (elPositionClimb) elPositionClimb.addEventListener('change', function () {
+      practiceState.positionClimb = this.checked;
+      updatePositionClimbInfo();
       if (practiceState.playing) { stop(); }
     });
 
@@ -1273,6 +1286,36 @@
     elIntervalInfo.textContent = LABELS[pattern] || '';
   }
 
+  function getClimbMaxPosition() {
+    var positions = practiceState.positions;
+    var max = 0;
+    for (var i = 0; i < positions.length; i++) {
+      if (isPositionComplete(i)) max = i;
+      else break;
+    }
+    return max;
+  }
+
+  function updatePositionClimbInfo() {
+    if (!elPositionClimbInfo) return;
+    if (!practiceState.positionClimb) {
+      elPositionClimbInfo.style.display = 'none';
+      return;
+    }
+    elPositionClimbInfo.style.display = '';
+    var maxPos = getClimbMaxPosition();
+    var playable = maxPos + 1;
+    if (practiceState.playing) {
+      var idx = practiceState._climbCurrentIdx;
+      var dir = practiceState._climbDirection === 'up' ? '↑' : '↓';
+      var pos = practiceState.positions[idx];
+      var label = pos ? pos.label : 'Pos ' + (idx + 1);
+      elPositionClimbInfo.textContent = dir + ' Posición ' + (idx + 1) + '/' + playable + ' — ' + label;
+    } else {
+      elPositionClimbInfo.textContent = 'Sube ' + playable + ' posiciones completas y baja (Pos 1 → ' + playable + ' → 1)';
+    }
+  }
+
   /**
    * Transforma un array de notas MIDI aplicando un patrón de salto por intervalos.
    * Para terceras con notas [C,D,E,F,G,A,B]: C,E, D,F, E,G, F,A, G,B, A,C'
@@ -1386,6 +1429,34 @@
     elTransposeInfo.textContent = 'Tono actual: ' + rootName + ' (+' + semi + ' semitonos) — ' + (12 - semi) + ' tonos restantes';
   }
 
+  // ── Position climb helpers ──
+
+  function applyClimbPosition(posIdx) {
+    practiceState.selectedPosition = posIdx;
+    if (elPositionSelect) elPositionSelect.value = posIdx;
+    renderFretboard();
+  }
+
+  /**
+   * Checks if a position is "complete" — has the expected notes per string.
+   * Compares against the first position (index 0) which is always full.
+   * Returns false if any string has fewer notes than the reference.
+   */
+  function isPositionComplete(posIdx) {
+    var positions = practiceState.positions;
+    if (!positions || posIdx < 0 || posIdx >= positions.length) return false;
+    var pos = positions[posIdx];
+    var ref = positions[0];
+    if (!pos || !ref) return false;
+    // Count notes per string in both
+    for (var s = 0; s < 6; s++) {
+      var refCount = ref.noteData.filter(function (n) { return n.string === s; }).length;
+      var posCount = pos.noteData.filter(function (n) { return n.string === s; }).length;
+      if (refCount > 0 && posCount < refCount) return false;
+    }
+    return true;
+  }
+
   // ── Advance string group or transpose after a cycle ──
 
   function advanceAfterCycle() {
@@ -1403,7 +1474,38 @@
       updateStringModeInfo();
     }
 
-    // 2. If transpose all keys: advance semitone
+    // 2. If position climb mode: advance to next position
+    if (practiceState.positionClimb && practiceState.positions.length > 1) {
+      var total = practiceState.positions.length;
+      if (practiceState._climbDirection === 'up') {
+        var nextUp = practiceState._climbCurrentIdx + 1;
+        if (nextUp >= total || !isPositionComplete(nextUp)) {
+          // Can't go higher — start descending from current - 1
+          practiceState._climbDirection = 'down';
+          practiceState._climbCurrentIdx = practiceState._climbCurrentIdx - 1;
+        } else {
+          practiceState._climbCurrentIdx = nextUp;
+        }
+      } else {
+        practiceState._climbCurrentIdx--;
+      }
+
+      // Check if descent finished
+      if (practiceState._climbCurrentIdx < 0) {
+        // Finished full climb cycle (up + down)
+        practiceState._climbCurrentIdx = 0;
+        practiceState._climbDirection = 'up';
+        applyClimbPosition(0);
+        updatePositionClimbInfo();
+        // Fall through to transpose/loop
+      } else {
+        applyClimbPosition(practiceState._climbCurrentIdx);
+        updatePositionClimbInfo();
+        return true;
+      }
+    }
+
+    // 3. If transpose all keys: advance semitone
     if (practiceState.transposeAllKeys) {
       practiceState._transposeSemitones++;
       if (practiceState._transposeSemitones < 12) {
@@ -1416,7 +1518,7 @@
       // Fall through to loop check
     }
 
-    // 3. Check loop
+    // 4. Check loop
     return practiceState.loopOn;
   }
 
@@ -1432,6 +1534,15 @@
       practiceState._beatCount = 0;
       practiceState._stringPairIndex = 0;
       practiceState._transposeSemitones = 0;
+
+      // Initialize position climb
+      if (practiceState.positionClimb) {
+        practiceState._climbOriginalPosition = practiceState.selectedPosition;
+        practiceState._climbCurrentIdx = 0;
+        practiceState._climbDirection = 'up';
+        applyClimbPosition(0);
+        updatePositionClimbInfo();
+      }
 
       // Save original roots for transpose
       if (practiceState.progressionMode) {
@@ -1570,6 +1681,14 @@
     practiceState._noteIndex = 0;
     practiceState._beatCount = 0;
     practiceState._stringPairIndex = 0;
+
+    // Restore original position if climb mode was active
+    if (practiceState.positionClimb) {
+      applyClimbPosition(practiceState._climbOriginalPosition);
+      practiceState._climbCurrentIdx = 0;
+      practiceState._climbDirection = 'up';
+      updatePositionClimbInfo();
+    }
 
     // Restore original key if transposed
     if (practiceState._transposeSemitones > 0 && practiceState._transposeOriginalRootPc !== null) {
