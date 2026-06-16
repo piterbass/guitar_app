@@ -26,7 +26,9 @@
 
   // Estado
   // stringStates[i]: -1 = muted, 0 = open, 1-22 = fret number
-  let stringStates = [-1, -1, -1, -1, -1, -1];
+  // Arranca con un Dm7 de ejemplo (X X 0 2 1 1 = D A C F) para que la sección
+  // no abra vacía: muestra de entrada qué hace el analizador.
+  let stringStates = [-1, -1, 0, 2, 1, 1];
   let startFret = 1;
 
   // DOM refs
@@ -56,8 +58,8 @@
     document.getElementById('analyzer-play').addEventListener('click', playCurrentChord);
 
     updateFretLabel();
+    // renderFretboard() dispara doIdentify(), que identifica el Dm7 precargado
     renderFretboard();
-    renderResults([]);
   }
 
   function updateFretLabel() {

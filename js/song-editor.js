@@ -3,7 +3,7 @@
 // ============================================================
 
 (function () {
-  const { parseChord } = window.ChordParser;
+  const { parseChord, normalizeChordName } = window.ChordParser;
   const { findVoicings } = window.VoicingFinder;
   const { createDiagram } = window.FretboardSVG;
   const SB = window.Songbook;
@@ -91,7 +91,8 @@
         const chordRaw = match[1].trim();
         // Strip optional :N beat notation for display
         const beatMatch = chordRaw.match(/^(.+):(\d+)$/);
-        const chordName = beatMatch ? beatMatch[1].trim() : chordRaw;
+        // Unificar a cifrado americano (la app usa C, D, E… no Do, Re, Mi…)
+        const chordName = normalizeChordName(beatMatch ? beatMatch[1].trim() : chordRaw);
         const beatsSuffix = beatMatch ? `:${beatMatch[2]}` : '';
         const clickAttr = editorMode
           ? `onclick="SongEditor.onChordClick('${escapeAttr(chordName)}')" class="chord-marker clickable"`
@@ -573,10 +574,26 @@
     return result.trimEnd();
   }
 
+  /**
+   * Convierte los acordes [Acorde] del contenido a cifrado americano, dejando
+   * intacta la letra (que puede contener palabras como "mi", "la", "sol").
+   * Preserva la notación de beats ":N".
+   */
+  function normalizeContentChords(content) {
+    return content.replace(/\[([^\]]+)\]/g, function (full, inner) {
+      const raw = inner.trim();
+      const beatMatch = raw.match(/^(.+):(\d+)$/);
+      const chordName = beatMatch ? beatMatch[1].trim() : raw;
+      const beats = beatMatch ? ':' + beatMatch[2] : '';
+      return '[' + normalizeChordName(chordName) + beats + ']';
+    });
+  }
+
   function save() {
     const title = document.getElementById('editor-title').value.trim() || 'Sin titulo';
     const artist = document.getElementById('editor-artist').value.trim();
-    const content = document.getElementById('editor-content').value;
+    // Guardar en cifrado americano aunque se haya escrito en latino (Do, Re…)
+    const content = normalizeContentChords(document.getElementById('editor-content').value);
 
     const song = {
       id: currentSongId,

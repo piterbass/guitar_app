@@ -97,5 +97,35 @@
     _persist(data);
   }
 
+  // Siembra una canción de ejemplo (Autumn Leaves) la primera vez que se abre
+  // la app con el cancionero vacío, para que "Mis Canciones" no arranque pelado.
+  // Usa un flag para no repetir: si el usuario la borra, no vuelve; y si ya
+  // tiene canciones, solo marca el flag sin agregar nada.
+  const SEED_KEY = 'guitar-songbook-seeded';
+
+  function seedExampleIfEmpty() {
+    try {
+      if (localStorage.getItem(SEED_KEY)) return;
+      const data = _load();
+      if (data.songs.length === 0) {
+        const now = Date.now();
+        data.songs.push({
+          id: 'example-autumn-leaves',
+          title: 'Autumn Leaves',
+          artist: 'Joseph Kosma',
+          content: 'A:\n[Cm7] [F7] [Bbmaj7] [Ebmaj7]\n[Am7b5] [D7] [Gm7] [Gm7]\n\nB:\n[Am7b5] [D7] [Gm7] [Ebmaj7]\n[Am7b5] [D7] [Gm7] [Gm7]',
+          pinnedVoicings: [],
+          createdAt: now,
+          updatedAt: now,
+          example: true,
+        });
+        _persist(data);
+      }
+      localStorage.setItem(SEED_KEY, '1');
+    } catch (e) { /* localStorage no disponible: ignorar */ }
+  }
+
+  seedExampleIfEmpty();
+
   window.Songbook = { getSongs, getSong, saveSong, deleteSong, extractChords, exportJSON, importJSON };
 })();

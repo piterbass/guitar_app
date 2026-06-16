@@ -67,6 +67,22 @@
 
     // Populate initial source
     onSourceTypeChanged()
+
+    // Pre-cargar un ejemplo (Autumn Leaves) para que la sección no abra vacía:
+    // así quien no sabe usarla ve de entrada qué hace el análisis.
+    preloadExample('autumn-leaves')
+  }
+
+  // ── Ejemplo precargado ──
+
+  function preloadExample(progId) {
+    if (!elSourceSelect) return
+    // Solo si la fuente es la biblioteca y existe la progresión
+    if (elSourceType.value !== 'library') return
+    var opt = elSourceSelect.querySelector('option[value="' + progId + '"]')
+    if (!opt) return
+    elSourceSelect.value = progId
+    onSourceSelected()
   }
 
   // ── Load saved scale map from practice mode ──
@@ -151,6 +167,11 @@
   // ── Core analysis ──
 
   function analyzeChords(chords, savedScaleMap) {
+    // Unificar a cifrado americano: la app entera lo usa, así evitamos mezclar
+    // notación latina (Do, Re, Mi…) en una canción puntual con el resto.
+    if (Parser && Parser.normalizeChordName) {
+      chords = chords.map(function (c) { return Parser.normalizeChordName(c) })
+    }
     state.chords = chords
     state.selectedChordIdx = 0
 

@@ -8,6 +8,47 @@
   // Calidades ordenadas de más larga a más corta para longest-match
   const QUALITIES = Object.keys(CHORD_FORMULAS).sort((a, b) => b.length - a.length);
 
+  // Notación latina (solfeo) → letra inglesa, solo para la raíz/bajo.
+  // 'sol' primero para longest-match (no choca con otros, pero por prolijidad).
+  const SOLFEGE_TO_LETTER = { sol: 'G', do: 'C', re: 'D', mi: 'E', fa: 'F', la: 'A', si: 'B' };
+  const SOLFEGE_NAMES = ['sol', 'do', 're', 'mi', 'fa', 'la', 'si'];
+
+  /**
+   * Convierte una nota latina (Do, Re, Mi, Fa, Sol, La, Si) al inicio de un
+   * string a notación inglesa (C, D, E, F, G, A, B). Si no hay match, devuelve
+   * el string sin cambios. La única letra inicial compartida con la notación
+   * inglesa es 'F' (inglés F / español Fa), desambiguada por el 2º carácter.
+   */
+  function solfegeToEnglish(str) {
+    const lower = str.toLowerCase();
+    for (const name of SOLFEGE_NAMES) {
+      if (lower.startsWith(name)) {
+        // 'Fa' colisiona con el cifrado americano F + calidad (aug/add/alt):
+        // ahí la 'a' pertenece a la calidad, no a la nota. En ambos casos la
+        // raíz es F, así que basta con no consumir la 'a'.
+        if (name === 'fa' && /^fa(ug|dd|lt)/.test(lower)) break;
+        return SOLFEGE_TO_LETTER[name] + str.slice(name.length);
+      }
+    }
+    return str;
+  }
+
+  /**
+   * Normaliza un nombre de acorde completo a cifrado americano: convierte la
+   * raíz y el bajo (tras "/") de notación latina a inglesa, dejando intacta la
+   * calidad y las extensiones. "Rem7(9)" → "Dm7(9)", "DoMaj7/Sol" → "CMaj7/G".
+   * Toda la app usa cifrado americano, así que esto unifica la notación.
+   */
+  function normalizeChordName(input) {
+    if (!input || !input.trim()) return input;
+    let s = solfegeToEnglish(input.trim());
+    const slashIdx = s.indexOf('/');
+    if (slashIdx >= 0) {
+      s = s.slice(0, slashIdx + 1) + solfegeToEnglish(s.slice(slashIdx + 1));
+    }
+    return s;
+  }
+
   /**
    * Parsea un string de acorde como "Dm7/11", "Cmaj9", "G7#5/B"
    * @param {string} input
@@ -15,7 +56,8 @@
    */
   function parseChord(input) {
     if (!input || !input.trim()) return null;
-    let s = input.trim();
+    // 0. Normalizar notación latina (Do Re Mi…) a cifrado americano
+    let s = normalizeChordName(input.trim());
 
     // 1. Extraer raíz (A-G seguido opcionalmente de # o b)
     const rootMatch = s.match(/^([A-Ga-g])([#b]?)/);
@@ -140,5 +182,5 @@
     return name;
   }
 
-  window.ChordParser = { parseChord, buildChordName };
+  window.ChordParser = { parseChord, buildChordName, normalizeChordName };
 })();
