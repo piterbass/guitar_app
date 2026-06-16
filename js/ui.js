@@ -41,6 +41,16 @@
     harmonic: ['ANÁLISIS ARMÓNICO',     'Entendé cada progresión'],
   }
 
+  function setMobileMenuOpen(isOpen) {
+    const header = document.querySelector('header');
+    const toggle = document.getElementById('nav-menu-toggle');
+    if (!header || !toggle) return;
+
+    header.classList.toggle('menu-open', isOpen);
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    toggle.setAttribute('aria-label', isOpen ? 'Cerrar menu' : 'Abrir menu');
+  }
+
   function showSection(sectionName) {
     document.querySelectorAll('.app-section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('section-' + sectionName);
@@ -73,6 +83,8 @@
       if (elEyebrow) elEyebrow.textContent = copy[0]
       if (elTitle) elTitle.textContent = copy[1]
     }
+
+    setMobileMenuOpen(false);
   }
 
   // ── Init ────────────────────────────────────────────────────
@@ -183,6 +195,22 @@
     document.getElementById('btn-manual-save').addEventListener('click', saveManualVoicing);
 
     // Nav principal
+    const navMenuToggle = document.getElementById('nav-menu-toggle');
+    if (navMenuToggle) {
+      navMenuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenuToggle.getAttribute('aria-expanded') === 'true';
+        setMobileMenuOpen(!isOpen);
+      });
+
+      document.addEventListener('click', (e) => {
+        const header = document.querySelector('header');
+        if (header && header.classList.contains('menu-open') && !header.contains(e.target)) {
+          setMobileMenuOpen(false);
+        }
+      });
+    }
+
     document.getElementById('nav-chords').addEventListener('click', () => showSection('chords'));
     document.getElementById('nav-scales').addEventListener('click', () => showSection('scales'));
     document.getElementById('nav-songs').addEventListener('click', () => {
