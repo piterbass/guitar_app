@@ -366,8 +366,63 @@
     if (currentSongId) window.SongEditor.open(currentSongId);
   }
 
-  function printSong() {
-    window.print();
+  // ── Exportar PDF ───────────────────────────────────────────
+
+  // Convierte una línea con acordes inline [C]letra en dos filas de texto
+  // monoespaciado: una de acordes posicionados sobre la fila de letra.
+  function splitChordLyric(line) {
+    let lyric = '', chord = '', last = 0;
+    const re = /\[([^\]]+)\]/g;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      lyric += line.slice(last, m.index);
+      let name = m[1].trim();
+      const beat = name.match(/^(.+):(\d+)$/);
+      if (beat) name = beat[1].trim();
+      if (chord.length < lyric.length) chord += ' '.repeat(lyric.length - chord.length);
+      chord += name + ' ';
+      last = m.index + m[0].length;
+    }
+    lyric += line.slice(last);
+    const textOnly = line.replace(/\[[^\]]+\]/g, '').trim();
+    return {
+      chordRow: chord.replace(/\s+$/, ''),
+      lyricRow: lyric.replace(/\s+$/, ''),
+      chordOnly: textOnly === '',
+    };
+  }
+
+  function buildPdfItems(song, content) {
+    const items = [
+      { text: song.title || 'Sin título', bold: true, size: 16 },
+    ];
+    if (song.artist) items.push({ text: song.artist, size: 11 });
+    items.push({ text: '', size: 9 }); // espacio
+
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (line.trim() === '') { items.push({ text: '', size: 10 }); continue; }
+      const r = splitChordLyric(line);
+      if (r.chordOnly) {
+        items.push({ text: r.chordRow, bold: true, size: 10, spaceBefore: 4 });
+      } else {
+        if (r.chordRow.trim() !== '') items.push({ text: r.chordRow, bold: true, size: 10, spaceBefore: 4 });
+        items.push({ text: r.lyricRow, size: 10 });
+      }
+    }
+    return items;
+  }
+
+  function downloadPdf() {
+    if (!currentSong || !window.PdfExport) return;
+    stopAutoScroll();
+    // Exportar lo que se ve (respeta la transposición actual)
+    const content = transposeSemitones === 0
+      ? currentSong.content
+      : transposeContent(currentSong.content, transposeSemitones);
+    const items = buildPdfItems(currentSong, content);
+    const base = currentSong.title + (currentSong.artist ? ' - ' + currentSong.artist : '');
+    window.PdfExport.downloadTextPdf(base, items);
   }
 
   function backToList() {
@@ -388,7 +443,7 @@
 
   // ── Event bindings ─────────────────────────────────────────
   function initEvents() {
-    document.getElementById('btn-view-print').addEventListener('click', printSong);
+    document.getElementById('btn-view-print').addEventListener('click', downloadPdf);
     document.getElementById('btn-view-edit').addEventListener('click', editCurrent);
     document.getElementById('btn-view-back').addEventListener('click', backToList);
     document.getElementById('btn-font-up').addEventListener('click', () => changeFontSize(2));
