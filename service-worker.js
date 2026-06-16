@@ -2,7 +2,7 @@
 // service-worker.js  –  Cache offline para Guitar App PWA
 // ============================================================
 
-const CACHE_NAME = 'guitar-app-v54';
+const CACHE_NAME = 'guitar-app-v59';
 
 const ASSETS = [
   './',
@@ -34,7 +34,7 @@ const ASSETS = [
   './js/harmonic-analysis-ui.js',
   './js/ui.js',
   './js/backup.js',
-  './public/header.jpg',
+  './public/guitarra.png',
   './public/Magic_Brain_Transparent_4.png',
 ];
 

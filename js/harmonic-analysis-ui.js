@@ -257,7 +257,7 @@
       var rootName = MT.pcToName(cs.rootPc)
       var customIcon = cs.customScale ? ' <span class="ha-custom-icon" title="Escala personalizada (modo práctica)">&#9734;</span>' : ''
 
-      html += '<tr data-idx="' + i + '" style="cursor:pointer;' + (i === state.selectedChordIdx ? 'background:#1a2540;' : '') + '">' +
+      html += '<tr data-idx="' + i + '" style="cursor:pointer;' + (i === state.selectedChordIdx ? 'background:rgba(255,201,77,.06);' : '') + '">' +
         '<td><strong>' + chords[i] + '</strong></td>' +
         '<td class="ha-degree">' + (cs.degree || '?') + '</td>' +
         '<td class="' + funcClass + '">' + (funcLabels[cs.func] || cs.func) + '</td>' +

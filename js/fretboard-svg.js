@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // fretboard-svg.js  –  Renderizado SVG de diagramas de acordes
 // ============================================================
 
@@ -50,18 +50,18 @@
     }
     const isOpenPosition = startFret === 1;
 
-    // Fondo
+    // Fondo transparente — la card provee el bg
     const bg = svgEl('rect', {
       x: 0, y: 0, width: totalW, height: totalH,
-      fill: '#fff', rx: 4
+      fill: 'transparent', rx: 4
     });
     svg.appendChild(bg);
 
     // Nombre del acorde
     const title = svgEl('text', {
       x: totalW / 2, y: 14,
-      'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold',
-      fill: '#333'
+      'text-anchor': 'middle', 'font-size': 13, 'font-weight': '700',
+      fill: '#ffc94d', 'font-family': "'Space Grotesk', sans-serif"
     });
     title.textContent = chordName;
     svg.appendChild(title);
@@ -71,12 +71,12 @@
       svg.appendChild(svgEl('rect', {
         x: CFG.padLeft - 2, y: CFG.padTop - 3,
         width: (NUM_STRINGS - 1) * CFG.stringSpacing + 4, height: 5,
-        fill: '#333', rx: 1
+        fill: 'rgba(214,180,140,.45)', rx: 1
       }));
     } else {
       const fretLabel = svgEl('text', {
         x: CFG.padLeft - 12, y: CFG.padTop + CFG.fretSpacing / 2 + 4,
-        'text-anchor': 'middle', 'font-size': 10, fill: '#666'
+        'text-anchor': 'middle', 'font-size': 10, fill: '#cdb89a'
       });
       fretLabel.textContent = startFret + 'fr';
       svg.appendChild(fretLabel);
@@ -88,20 +88,19 @@
       svg.appendChild(svgEl('line', {
         x1: CFG.padLeft, y1: y,
         x2: CFG.padLeft + (NUM_STRINGS - 1) * CFG.stringSpacing, y2: y,
-        stroke: f === 0 ? '#333' : '#aaa',
-        'stroke-width': f === 0 && !isOpenPosition ? 1 : 1
+        stroke: f === 0 ? 'rgba(214,180,140,.32)' : 'rgba(214,180,140,.18)',
+        'stroke-width': 1
       }));
     }
 
     // Cuerdas (líneas verticales)
     for (let s = 0; s < NUM_STRINGS; s++) {
       const x = CFG.padLeft + s * CFG.stringSpacing;
-      // Grosor variable: cuerdas graves más gruesas
-      const sw = 1 + (NUM_STRINGS - 1 - s) * 0.2;
+      const sw = 1 + (NUM_STRINGS - 1 - s) * 0.18;
       svg.appendChild(svgEl('line', {
         x1: x, y1: CFG.padTop,
         x2: x, y2: CFG.padTop + FRETS_SHOWN * CFG.fretSpacing,
-        stroke: '#555', 'stroke-width': sw
+        stroke: 'rgba(214,180,140,.24)', 'stroke-width': sw
       }));
     }
 
@@ -116,7 +115,7 @@
         y: barreY - CFG.dotRadius * 0.7,
         width: x2 - x1 + CFG.dotRadius * 2,
         height: CFG.dotRadius * 1.4,
-        fill: '#333', rx: CFG.dotRadius * 0.7,
+        fill: '#f3ece0', rx: CFG.dotRadius * 0.7,
         'pointer-events': 'none'
       }));
       // Invisible chord-dot markers per barre string (for arpeggio highlight)
@@ -143,7 +142,7 @@
         const xMark = svgEl('text', {
           x: x, y: CFG.padTop - 10,
           'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
-          fill: '#c00'
+          fill: '#e0653a'
         });
         xMark.textContent = '\u00D7';
         svg.appendChild(xMark);
@@ -152,7 +151,7 @@
         addHitArea(svg, x, CFG.padTop - 12, STANDARD_TUNING[s]);
         const openCircle = svgEl('circle', {
           cx: x, cy: CFG.padTop - 12,
-          r: 5, fill: 'none', stroke: '#333', 'stroke-width': 1.5,
+          r: 5, fill: 'none', stroke: '#f3ece0', 'stroke-width': 1.5,
           'pointer-events': 'none',
           'data-string': s, 'data-midi': STANDARD_TUNING[s],
           class: 'chord-dot'
@@ -172,7 +171,7 @@
         } else {
           const dot = svgEl('circle', {
             cx: x, cy: y, r: CFG.dotRadius,
-            fill: '#333', 'pointer-events': 'none',
+            fill: '#f3ece0', 'pointer-events': 'none',
             'data-string': s, 'data-midi': STANDARD_TUNING[s] + fret,
             'data-type': 'chord-dot'
           });
@@ -187,7 +186,7 @@
           const fingerText = svgEl('text', {
             x: x, y: fingerY + 4,
             'text-anchor': 'middle', 'font-size': 9, 'font-weight': 'bold',
-            fill: '#fff', 'pointer-events': 'none'
+            fill: '#1a130a', 'pointer-events': 'none'
           });
           fingerText.textContent = voicing.fingers[s];
           svg.appendChild(fingerText);
@@ -202,7 +201,7 @@
       const noteLabel = svgEl('text', {
         x: x, y: totalH - 5,
         'text-anchor': 'middle', 'font-size': 9,
-        fill: noteName === 'X' ? '#c00' : '#555'
+        fill: noteName === 'X' ? '#e0653a' : '#9c8e79'
       });
       noteLabel.textContent = noteName;
       svg.appendChild(noteLabel);
@@ -212,7 +211,7 @@
     const tabStr = voicing.frets.map(f => f === -1 ? 'x' : f).join('-');
     const tabLabel = svgEl('text', {
       x: totalW / 2, y: 27,
-      'text-anchor': 'middle', 'font-size': 9, fill: '#888'
+      'text-anchor': 'middle', 'font-size': 9, fill: '#9c8e79'
     });
     tabLabel.textContent = tabStr;
     svg.appendChild(tabLabel);
@@ -222,7 +221,7 @@
       const bw = 48, bh = 14;
       svg.appendChild(svgEl('rect', {
         x: totalW - bw - 4, y: 2, width: bw, height: bh,
-        fill: '#e94560', rx: 3
+        fill: '#e0653a', rx: 4
       }));
       const badgeText = svgEl('text', {
         x: totalW - bw / 2 - 4, y: 12,
@@ -313,16 +312,16 @@
 
       if (isChordPos) {
         // Nota del voicing: anillo (gold target > violeta modal > teal)
-        const color = isTarget ? '#ffe66d' : isModal ? '#bb86fc' : '#4ecdc4';
+        const color = isTarget ? '#ffc94d' : isModal ? '#b58bff' : '#4abd9c';
         const width = isTarget ? 3 : isModal ? 3 : 2.5;
         return { ring: true, color, width };
       }
-      if (isTarget) return { fill: '#ffe66d', opacity: 0.85, r: 6, textFill: '#333' };
-      if (isModal) return { fill: '#bb86fc', opacity: 0.80, r: 6, textFill: '#fff' };
-      if (isChordTone) return { fill: '#4ecdc4', opacity: 0.8, r: 5, textFill: '#fff' };
-      if (isTension) return { fill: '#ff9f43', opacity: 0.65, r: 5, textFill: '#fff' };
-      if (isAvoid) return { fill: '#ff6b6b', opacity: 0.3, r: 4, textFill: '#fff' };
-      return { fill: '#4ecdc4', opacity: 0.45, r: 5, textFill: '#fff' };
+      if (isTarget) return { fill: '#ffc94d', opacity: 0.90, r: 6, textFill: '#1a130a' };
+      if (isModal) return { fill: '#b58bff', opacity: 0.85, r: 6, textFill: '#fff' };
+      if (isChordTone) return { fill: '#4abd9c', opacity: 0.85, r: 5, textFill: '#1a130a' };
+      if (isTension) return { fill: '#ff9f43', opacity: 0.70, r: 5, textFill: '#1a130a' };
+      if (isAvoid) return { fill: '#f08a5d', opacity: 0.35, r: 4, textFill: '#1a130a' };
+      return { fill: '#4abd9c', opacity: 0.45, r: 5, textFill: '#1a130a' };
     }
 
     // Recorrer cuerdas y trastes visibles
@@ -406,8 +405,8 @@
     dot.setAttribute('data-orig-stroke', dot.getAttribute('stroke') || '');
     dot.setAttribute('data-orig-stroke-width', dot.getAttribute('stroke-width') || '');
     dot.setAttribute('data-orig-r', dot.getAttribute('r') || '');
-    dot.setAttribute('fill', '#ffe66d');
-    dot.setAttribute('stroke', '#fff');
+    dot.setAttribute('fill', '#ffc94d');
+    dot.setAttribute('stroke', '#f3ece0');
     dot.setAttribute('stroke-width', '2.5');
     var origR = parseFloat(dot.getAttribute('data-orig-r')) || CFG.dotRadius;
     dot.setAttribute('r', String(origR + 3));

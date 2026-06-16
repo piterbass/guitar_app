@@ -31,14 +31,14 @@
 
   // Colores
   const COLORS = {
-    root: '#e94560',
-    rootDim: 'rgba(233, 69, 96, 0.35)',
-    triad: '#4ecdc4',
-    scale: '#7a8a9a',
-    dimmed: 'rgba(120, 140, 160, 0.18)',
+    root: '#ffb020',
+    rootDim: 'rgba(255,176,32,.35)',
+    triad: '#4abd9c',
+    scale: '#1f8a72',
+    dimmed: 'rgba(31,138,114,.22)',
     playing: '#ffe66d',
-    positionWindow: 'rgba(78, 205, 196, 0.06)',
-    positionBorder: 'rgba(78, 205, 196, 0.18)',
+    positionWindow: 'rgba(31,138,114,.06)',
+    positionBorder: 'rgba(31,138,114,.2)',
   };
 
   // Referencia al SVG actual para highlights
@@ -112,7 +112,7 @@
     // ── Fondo ──
     svg.appendChild(svgEl('rect', {
       x: 0, y: 0, width: totalW, height: totalH,
-      fill: '#0d1b36', rx: 6,
+      fill: '#15100b', rx: 6,
     }));
 
     // ── Ventana de posición (highlight del rango) ──
@@ -137,7 +137,7 @@
       x: nutX - CFG.nutWidth / 2, y: CFG.padTop - 6,
       width: CFG.nutWidth,
       height: (NUM_STRINGS - 1) * CFG.stringSpacing + 12,
-      fill: '#ccc', rx: 1,
+      fill: 'rgba(214,180,140,.6)', rx: 1,
     }));
 
     // ── Trastes (líneas verticales) ──
@@ -146,7 +146,7 @@
       svg.appendChild(svgEl('line', {
         x1: x, y1: CFG.padTop - 4,
         x2: x, y2: CFG.padTop + (NUM_STRINGS - 1) * CFG.stringSpacing + 4,
-        stroke: '#444', 'stroke-width': 1,
+        stroke: 'rgba(214,180,140,.18)', 'stroke-width': 1,
       }));
     }
 
@@ -163,7 +163,7 @@
         y1: y,
         x2: CFG.padLeft + (numFrets + 1) * CFG.fretSpacing,
         y2: y,
-        stroke: '#666', 'stroke-width': thickness,
+        stroke: 'rgba(214,180,140,.28)', 'stroke-width': thickness,
       }));
 
       // Nombre de cuerda
@@ -171,7 +171,7 @@
         x: CFG.padLeft - 14,
         y: y + 4,
         'text-anchor': 'middle', 'font-size': 10,
-        fill: '#888', 'font-weight': 'bold',
+        fill: '#9c8e79', 'font-weight': 'bold',
       });
       nameText.textContent = STRING_NAMES[s];
       svg.appendChild(nameText);
@@ -184,14 +184,14 @@
       const x = CFG.padLeft + f * CFG.fretSpacing;
       svg.appendChild(svgEl('circle', {
         cx: x, cy: inlayY,
-        r: 3, fill: '#333',
+        r: 3, fill: 'rgba(214,180,140,.2)',
       }));
     }
     for (const f of DOUBLE_INLAY) {
       if (f > numFrets) continue;
       const x = CFG.padLeft + f * CFG.fretSpacing;
-      svg.appendChild(svgEl('circle', { cx: x - 6, cy: inlayY, r: 3, fill: '#333' }));
-      svg.appendChild(svgEl('circle', { cx: x + 6, cy: inlayY, r: 3, fill: '#333' }));
+      svg.appendChild(svgEl('circle', { cx: x - 6, cy: inlayY, r: 3, fill: 'rgba(214,180,140,.2)' }));
+      svg.appendChild(svgEl('circle', { cx: x + 6, cy: inlayY, r: 3, fill: 'rgba(214,180,140,.2)' }));
     }
 
     // ── Números de traste ──
@@ -199,7 +199,7 @@
       const x = CFG.padLeft + f * CFG.fretSpacing;
       const numText = svgEl('text', {
         x: x, y: inlayY + (INLAY_FRETS.includes(f) || DOUBLE_INLAY.includes(f) ? 14 : 6),
-        'text-anchor': 'middle', 'font-size': 9, fill: '#555',
+        'text-anchor': 'middle', 'font-size': 9, fill: '#9c8e79',
       });
       numText.textContent = f;
       svg.appendChild(numText);
@@ -273,7 +273,7 @@
 
         // Borde extra para root en posición
         if (isRoot && isInPosition) {
-          dot.setAttribute('stroke', '#fff');
+          dot.setAttribute('stroke', 'rgba(255,176,32,.7)');
           dot.setAttribute('stroke-width', '2');
         }
 
@@ -294,9 +294,8 @@
             'text-anchor': 'middle',
             'font-size': CFG.fontSize,
             'font-weight': 'bold',
-            fill: (isRoot && isInPosition) ? '#fff'
-              : isRoot ? 'rgba(255,255,255,0.5)'
-              : (fill === COLORS.dimmed ? '#666' : '#fff'),
+            fill: isRoot ? '#1a130a'
+              : (fill === COLORS.dimmed ? 'rgba(255,255,255,.4)' : '#fff'),
             'pointer-events': 'none',
           });
           text.textContent = labelText;

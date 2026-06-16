@@ -211,10 +211,9 @@
     const system = Engine.getPositionSystemLabel(state.scaleKey);
 
     elInfo.innerHTML =
-      '<span style="color:#e94560; font-weight:bold;">' + rootName + '</span> ' +
-      '<span style="color:#4ecdc4; font-weight:bold;">' + scaleName + '</span>' +
-      ' <span style="color:#888; font-size:0.8rem;">(' + family + ' · ' + system + ')</span>' +
-      '<br><span style="color:#a0a0b0; font-size:0.85rem;">Notas: ' + noteNames + '</span>';
+      '<div class="scales-info-name">' + rootName + ' ' + scaleName + '</div>' +
+      '<div class="scales-info-sub">' + family + ' · ' + system + '</div>' +
+      '<div class="scales-info-notes">Notas: <strong>' + noteNames + '</strong></div>';
   }
 
   // ── Position dots ─────────────────────────────────────────

@@ -33,6 +33,14 @@
 
   // ── Navegación principal ────────────────────────────────────
 
+  const HERO_COPY = {
+    chords:   ['GENERADOR DE ACORDES',  'Encontrá el voicing perfecto'],
+    scales:   ['EXPLORADOR DE ESCALAS', 'Dominá el mástil completo'],
+    songs:    ['TU CANCIONERO',         'Progresiones siempre a mano'],
+    analyzer: ['ANALIZADOR DE ACORDES', 'Descubrí qué estás tocando'],
+    harmonic: ['ANÁLISIS ARMÓNICO',     'Entendé cada progresión'],
+  }
+
   function showSection(sectionName) {
     document.querySelectorAll('.app-section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('section-' + sectionName);
@@ -54,6 +62,16 @@
       document.getElementById('nav-analyzer').classList.add('active');
     } else if (sectionName === 'harmonic') {
       document.getElementById('nav-harmonic').classList.add('active');
+    }
+
+    // Actualizar hero copy
+    const baseSection = sectionName.replace('song-edit', 'songs').replace('song-view', 'songs')
+    const copy = HERO_COPY[baseSection]
+    if (copy) {
+      const elEyebrow = document.getElementById('hero-eyebrow')
+      const elTitle = document.getElementById('hero-title')
+      if (elEyebrow) elEyebrow.textContent = copy[0]
+      if (elTitle) elTitle.textContent = copy[1]
     }
   }
 
@@ -575,7 +593,7 @@
 
   function clearScaleHighlights() {
     document.querySelectorAll('[data-highlighted="1"]').forEach(function (el) {
-      el.setAttribute('fill', el.getAttribute('data-orig-fill') || '#4ecdc4');
+      el.setAttribute('fill', el.getAttribute('data-orig-fill') || '#4abd9c');
       el.setAttribute('opacity', el.getAttribute('data-orig-opacity') || '0.45');
       var origR = el.getAttribute('data-orig-r');
       if (origR) el.setAttribute('r', origR);
@@ -771,7 +789,7 @@
         } else {
           var n = parseInt(val, 10);
           if (isNaN(n) || n < 0 || n > 24) {
-            inp.style.borderColor = '#e94560';
+            inp.style.borderColor = '#e0653a';
             valid = false;
           } else {
             newFrets.push(n);
@@ -1042,7 +1060,7 @@
       }
 
       // Feedback visual
-      fixScaleBtn.style.background = '#4ecdc4';
+      fixScaleBtn.style.background = '#4abd9c';
       setTimeout(function () { fixScaleBtn.style.background = ''; }, 400);
     });
 
@@ -1268,9 +1286,9 @@
             <span class="song-chords-preview">${chords.slice(0, 8).join(' - ')}${chords.length > 8 ? '...' : ''}</span>
           </div>
           <div class="song-actions">
-            <button class="btn-small" data-action="view">Ver</button>
-            <button class="btn-small btn-secondary" data-action="edit">Editar</button>
-            <button class="btn-small btn-danger" data-action="delete">Eliminar</button>
+            <button class="btn-song-view" data-action="view">&#9654; Ver</button>
+            <button class="btn-song-edit" data-action="edit">Editar</button>
+            <button class="btn-song-delete" data-action="delete">Eliminar</button>
           </div>
         `;
 

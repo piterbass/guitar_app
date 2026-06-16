@@ -88,7 +88,7 @@
     // Fondo
     svg.appendChild(svgEl('rect', {
       x: 0, y: 0, width: totalW, height: totalH,
-      fill: '#1e1e30', rx: 6,
+      fill: '#1b130d', rx: 6,
     }));
 
     // Cejuela o indicador de traste
@@ -96,12 +96,12 @@
       svg.appendChild(svgEl('rect', {
         x: CFG.padLeft - 3, y: CFG.padTop - 3,
         width: (NUM_STRINGS - 1) * CFG.stringSpacing + 6, height: 5,
-        fill: '#ccc', rx: 1,
+        fill: 'rgba(214,180,140,.6)', rx: 1,
       }));
     } else {
       const fl = svgEl('text', {
         x: CFG.padLeft - 14, y: CFG.padTop + CFG.fretSpacing / 2 + 4,
-        'text-anchor': 'middle', 'font-size': 10, fill: '#888',
+        'text-anchor': 'middle', 'font-size': 10, fill: '#9c8e79',
       });
       fl.textContent = startFret + 'fr';
       svg.appendChild(fl);
@@ -113,7 +113,7 @@
       svg.appendChild(svgEl('line', {
         x1: CFG.padLeft, y1: y,
         x2: CFG.padLeft + (NUM_STRINGS - 1) * CFG.stringSpacing, y2: y,
-        stroke: '#555', 'stroke-width': f === 0 ? 2 : 1,
+        stroke: f === 0 ? 'rgba(214,180,140,.5)' : 'rgba(214,180,140,.18)', 'stroke-width': f === 0 ? 2 : 1,
       }));
     }
 
@@ -124,7 +124,7 @@
       svg.appendChild(svgEl('line', {
         x1: x, y1: CFG.padTop,
         x2: x, y2: CFG.padTop + FRETS_VISIBLE * CFG.fretSpacing,
-        stroke: '#888', 'stroke-width': sw,
+        stroke: 'rgba(214,180,140,.28)', 'stroke-width': sw,
       }));
     }
 
@@ -136,18 +136,18 @@
         const cy = CFG.padTop + (f - startFret + 0.5) * CFG.fretSpacing;
         const cx = CFG.padLeft + 2.5 * CFG.stringSpacing;
         svg.appendChild(svgEl('circle', {
-          cx, cy, r: 3, fill: '#444', 'pointer-events': 'none',
+          cx, cy, r: 3, fill: 'rgba(214,180,140,.2)', 'pointer-events': 'none',
         }));
       }
       if (doubleDotFrets.includes(f)) {
         const cy = CFG.padTop + (f - startFret + 0.5) * CFG.fretSpacing;
         svg.appendChild(svgEl('circle', {
           cx: CFG.padLeft + 1.5 * CFG.stringSpacing, cy, r: 3,
-          fill: '#444', 'pointer-events': 'none',
+          fill: 'rgba(214,180,140,.2)', 'pointer-events': 'none',
         }));
         svg.appendChild(svgEl('circle', {
           cx: CFG.padLeft + 3.5 * CFG.stringSpacing, cy, r: 3,
-          fill: '#444', 'pointer-events': 'none',
+          fill: 'rgba(214,180,140,.2)', 'pointer-events': 'none',
         }));
       }
     }
@@ -171,7 +171,7 @@
         const xText = svgEl('text', {
           x, y: CFG.headerY + 5,
           'text-anchor': 'middle', 'font-size': 14, 'font-weight': 'bold',
-          fill: '#e94560', 'pointer-events': 'none',
+          fill: '#e0653a', 'pointer-events': 'none',
         });
         xText.textContent = '\u00D7';
         svg.appendChild(xText);
@@ -179,7 +179,7 @@
         // Open O
         svg.appendChild(svgEl('circle', {
           cx: x, cy: CFG.headerY,
-          r: 7, fill: 'none', stroke: '#4ecdc4', 'stroke-width': 2,
+          r: 7, fill: 'none', stroke: '#4abd9c', 'stroke-width': 2,
           'pointer-events': 'none',
         }));
       } else {
@@ -188,7 +188,7 @@
         const nt = svgEl('text', {
           x, y: CFG.headerY + 4,
           'text-anchor': 'middle', 'font-size': 9, 'font-weight': 'bold',
-          fill: '#4ecdc4', 'pointer-events': 'none',
+          fill: '#4abd9c', 'pointer-events': 'none',
         });
         nt.textContent = noteName;
         svg.appendChild(nt);
@@ -227,7 +227,7 @@
       // Dot
       svg.appendChild(svgEl('circle', {
         cx: x, cy: y, r: CFG.dotRadius,
-        fill: '#e94560', 'pointer-events': 'none',
+        fill: '#ffb020', 'pointer-events': 'none',
       }));
 
       // Nota dentro del dot
@@ -235,7 +235,7 @@
       const nt = svgEl('text', {
         x, y: y + 4,
         'text-anchor': 'middle', 'font-size': 9, 'font-weight': 'bold',
-        fill: '#fff', 'pointer-events': 'none',
+        fill: '#1a130a', 'pointer-events': 'none',
       });
       nt.textContent = noteName;
       svg.appendChild(nt);
@@ -253,7 +253,7 @@
       const x = CFG.padLeft + s * CFG.stringSpacing;
       const lb = svgEl('text', {
         x, y: totalH - 4,
-        'text-anchor': 'middle', 'font-size': 8, fill: '#666',
+        'text-anchor': 'middle', 'font-size': 8, fill: '#9c8e79',
         'pointer-events': 'none',
       });
       lb.textContent = STRING_NAMES[s];

@@ -229,7 +229,7 @@
   function onSave() {
     if (state.selectedNotes.length === 0) {
       elNoteCount.textContent = 'Seleccioná al menos una nota';
-      elNoteCount.style.color = '#e94560';
+      elNoteCount.style.color = '#e0653a';
       setTimeout(function () { elNoteCount.style.color = '#a0a0b0'; }, 2000);
       return;
     }
@@ -248,7 +248,7 @@
     renderSavedList();
 
     elNoteCount.textContent = 'Posición guardada correctamente';
-    elNoteCount.style.color = '#4ecdc4';
+    elNoteCount.style.color = '#4abd9c';
     setTimeout(function () { elNoteCount.style.color = '#a0a0b0'; updateNoteCount(); }, 2000);
   }
 

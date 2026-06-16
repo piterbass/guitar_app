@@ -104,7 +104,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    elStatus.innerHTML = '<span style="color:#4ecdc4;">Backup descargado correctamente.</span>';
+    elStatus.innerHTML = '<span style="color:#4abd9c;">Backup descargado correctamente.</span>';
   }
 
   function onFileSelected() {
@@ -117,7 +117,7 @@
         var data = JSON.parse(e.target.result);
 
         if (!data._type || data._type !== 'guitar-app-backup') {
-          elStatus.innerHTML = '<span style="color:#e94560;">El archivo no es un backup válido.</span>';
+          elStatus.innerHTML = '<span style="color:#e0653a;">El archivo no es un backup válido.</span>';
           return;
         }
 
@@ -133,13 +133,13 @@
         if (restored.length === 0) {
           elStatus.innerHTML = '<span style="color:#f0a030;">El backup no contenía datos.</span>';
         } else {
-          elStatus.innerHTML = '<span style="color:#4ecdc4;">Restaurado: ' + restored.join(', ') +
+          elStatus.innerHTML = '<span style="color:#4abd9c;">Restaurado: ' + restored.join(', ') +
             '.<br>Recargá la página para ver los cambios.</span>';
         }
 
         refreshSummary();
       } catch (err) {
-        elStatus.innerHTML = '<span style="color:#e94560;">Error al leer el archivo: ' + err.message + '</span>';
+        elStatus.innerHTML = '<span style="color:#e0653a;">Error al leer el archivo: ' + err.message + '</span>';
       }
     };
     reader.readAsText(file);
