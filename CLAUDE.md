@@ -11,7 +11,7 @@ Funciona offline, es instalable en móvil, y cubre: acordes, escalas, canciones,
 - **Web Audio API** para reproducción y síntesis de sonido (samples Soundfont FluidR3 nylon guitar)
 - **SVG** para diagramas de trastes y acordes
 - **localStorage** para persistencia de datos del usuario
-- **Service Worker** con estrategia network-first y cache versionado (`?v=48`)
+- **Service Worker** con estrategia network-first y cache versionado (`CACHE_NAME` + `?v=NN`; ver `service-worker.js` para la versión actual)
 - **No hay package.json, npm, ni bundler** — los scripts se cargan directamente en `index.html`
 
 ## Estructura del proyecto
@@ -20,20 +20,22 @@ Funciona offline, es instalable en móvil, y cubre: acordes, escalas, canciones,
 ├── index.html                  # SPA principal (~3,365 líneas, incluye CSS inline)
 ├── service-worker.js           # Cache offline (CACHE_NAME = versión actual)
 ├── manifest.json               # Configuración PWA
-├── js/                         # 24 módulos JS (~10,000 líneas total)
+├── js/                         # 26 módulos JS (~10,000 líneas total)
 │   ├── Teoría musical:
 │   │   ├── music-theory.js     # NOTE_NAMES, CHORD_FORMULAS, SCALE_FORMULAS, intervalos
-│   │   ├── chord-parser.js     # Parseo de nombres de acordes ("Dm7/11" → root, quality, bass)
+│   │   ├── chord-parser.js     # Parseo de acordes ("Dm7/11" → root, quality, bass).
+│   │   │                       #   normalizeChordName(): traduce cifrado latino → americano
 │   │   ├── chord-identifier.js # Identificar acordes a partir de notas
 │   │   ├── scale-detector.js   # Encontrar escalas compatibles con acordes
-│   │   └── harmonic-context.js # Sugerencias por función armónica (tónica, dominante, etc.)
+│   │   ├── harmonic-context.js # Detección de tonalidad + sugerencias por función armónica
+│   │   └── harmonic-analysis-ui.js # UI del Análisis Armónico (grados, funciones, escalas)
 │   │
 │   ├── Acordes:
 │   │   ├── voicing-finder.js   # Búsqueda DFS de voicings en el mástil
 │   │   ├── chord-bank.js       # Guardar voicings favoritos (localStorage)
 │   │   ├── chord-practice.js   # Práctica interactiva con arpegios y notación [Chord:N]
 │   │   ├── chord-progressions.js # Biblioteca de progresiones (jazz, pop, cancionero)
-│   │   └── chord-analyzer-ui.js  # UI del analizador de acordes
+│   │   └── chord-analyzer-ui.js  # UI del analizador de acordes (precargado con Dm7)
 │   │
 │   ├── Escalas:
 │   │   ├── scale-bank.js         # Guardar escalas favoritas
@@ -43,9 +45,10 @@ Funciona offline, es instalable en móvil, y cubre: acordes, escalas, canciones,
 │   │   └── scales-ui.js           # UI de escalas
 │   │
 │   ├── Canciones:
-│   │   ├── songbook.js      # CRUD de canciones en localStorage
-│   │   ├── song-editor.js   # Editor en vivo con parseo de acordes y pin de voicings
-│   │   └── song-view.js     # Vista de canción con karaoke, voicing picker, animación arpegio
+│   │   ├── songbook.js      # CRUD de canciones (localStorage). Siembra Autumn Leaves de ejemplo
+│   │   ├── song-editor.js   # Editor en vivo: parseo de acordes, pin de voicings, import pegado
+│   │   ├── song-view.js     # Vista de canción: karaoke, voicing picker, transposición, export PDF
+│   │   └── pdf-export.js    # Generador de PDF vanilla (Courier, multipágina, offline, sin deps)
 │   │
 │   ├── Visualización y Audio:
 │   │   ├── fretboard-svg.js      # Diagramas SVG de acordes (130×90px)
@@ -91,6 +94,17 @@ Cada archivo JS usa **IIFE** (Immediately Invoked Function Expression) y exporta
 - **Idioma de la UI**: textos visibles al usuario en **español**
 - **Sin semicolons al final** en algunos módulos (inconsistente, pero seguir el estilo del archivo que se edite)
 
+## Notación de acordes
+
+**Toda la app usa cifrado americano** (C, D, E, F, G, A, B) — nunca latino (Do, Re, Mi…).
+Si entra notación latina (canción escrita por el usuario, texto pegado), se **traduce** a
+americano, no se soporta en paralelo. No mezclar notaciones.
+
+- `ChordParser.normalizeChordName(name)` convierte solfeo latino → inglés en raíz y bajo
+  (maneja la colisión `Fa` vs `F`+`aug`/`add`/`alt`). Se aplica al guardar/mostrar canciones
+  y en el Análisis Armónico (de ahí depende la correcta detección de tonalidad).
+- `song-editor.js` tiene además `latinToAmerican` para el import de texto pegado (LaCuerda).
+
 ## Cómo funciona el cache / deploy (cliente)
 
 1. Editar código
@@ -128,11 +142,13 @@ Se cargan al final de `index.html` en este orden (dependencias primero, UI al fi
 
 ## Storage (localStorage keys)
 
-- `songbook` — array de canciones
-- `chord-bank-*` — voicings guardados por acorde
-- `scale-bank` — escalas favoritas
-- `custom-scales` — posiciones de escala del usuario
-- `backup-*` — datos de backup
+- `guitar-songbook` — array de canciones
+- `guitar-songbook-seeded` — flag: ya se sembró la canción de ejemplo (Autumn Leaves)
+- `guitar-chord-bank` — voicings guardados por acorde
+- `guitar-scale-bank` — escalas favoritas
+- `guitar-custom-scales` — posiciones de escala del usuario
+- `cp-custom-voicings` — voicings custom del modo práctica de acordes
+- `practice-prog-scale-maps` — mapeo de escalas por progresión (modo práctica / análisis)
 
 ## Audio
 
