@@ -60,6 +60,13 @@
     playing: false,
     // runtime
     _intervalId: null,
+    _schedulerTimer: null,   // setInterval del scheduler look-ahead
+    _rafId: null,            // requestAnimationFrame del render visual
+    _nextNoteTime: 0,        // tiempo de audio del próximo evento a agendar
+    _visualQueue: [],        // eventos {time, midi, ...} pendientes de dibujar
+    _phase: 'countin',       // 'countin' | 'play' | 'ended'
+    _countIdx: 0,
+    _subBeatCounter: 0,
     _noteIndex: 0,
     _currentNotes: [],
     _beatCount: 0,
@@ -970,9 +977,13 @@
 
   function onPositionChanged() {
     // Stop playback without resetting progression position
-    if (practiceState._intervalId) {
-      clearInterval(practiceState._intervalId);
-      practiceState._intervalId = null;
+    if (practiceState._schedulerTimer) {
+      clearInterval(practiceState._schedulerTimer);
+      practiceState._schedulerTimer = null;
+    }
+    if (practiceState._rafId) {
+      cancelAnimationFrame(practiceState._rafId);
+      practiceState._rafId = null;
     }
     practiceState.playing = false;
     practiceState.paused = false;
@@ -1566,98 +1577,138 @@
     elStopBtn.disabled = false;
     elStopBtn.style.opacity = '1';
 
-    const beatMs = 60000 / practiceState.bpm;
+    const beatSec = 60 / practiceState.bpm;
     const sub = practiceState.subdivision || 1;
-    const noteIntervalMs = beatMs / sub;
-    const noteDuration = Math.max(noteIntervalMs / 1000 + 0.3, 0.4);
+    const noteSec = beatSec / sub;
+    const noteDuration = Math.max(noteSec + 0.3, 0.4);
 
-    // Count-in: 4 clicks at beat rate, then switch to note rate
-    let countIn = 4;
-    let countIdx = 0;
-    let subBeatCounter = 0; // tracks subdivision position within beat
+    // Look-ahead scheduler: el audio se agenda por adelantado sobre el reloj de
+    // Web Audio (preciso, inmune al jitter/GC del hilo principal). El render
+    // visual va por requestAnimationFrame leyendo una cola con timestamps de
+    // audio, así nunca bloquea el audio aunque el main thread se trabe.
+    const SCHEDULE_AHEAD = 0.12; // s: cuánto se agenda hacia adelante
+    const LOOKAHEAD_MS = 25;     // ms: cada cuánto corre el scheduler
 
-    // Phase 1: Count-in at beat rate
-    practiceState._intervalId = setInterval(() => {
-      if (countIdx < countIn) {
-        if (practiceState.metronomeOn) {
-          Audio.playClick(countIdx === 0);
+    Audio.resumeContext();
+    practiceState._phase = 'countin';
+    practiceState._countIdx = 0;
+    practiceState._subBeatCounter = 0;
+    practiceState._visualQueue = [];
+    practiceState._nextNoteTime = Audio.getAudioTime() + 0.1;
+
+    // Agenda el próximo evento (click de cuenta o nota) en tiempo de audio `when`.
+    function scheduleNextEvent(when) {
+      // Fase de cuenta: 4 clicks al ritmo de negra
+      if (practiceState._phase === 'countin') {
+        if (practiceState.metronomeOn) Audio.playClickAt(practiceState._countIdx === 0, when);
+        practiceState._visualQueue.push({ time: when, countIn: true, idx: practiceState._countIdx, total: 4 });
+        practiceState._countIdx++;
+        practiceState._nextNoteTime = when + beatSec;
+        if (practiceState._countIdx >= 4) {
+          practiceState._phase = 'play';
+          practiceState._subBeatCounter = 0;
         }
-        updateBeatIndicator(countIdx, countIn, true);
-        countIdx++;
         return;
       }
-      // Count-in done, switch to note-rate interval
-      clearInterval(practiceState._intervalId);
-      subBeatCounter = 0;
-      practiceState._intervalId = setInterval(playTick, noteIntervalMs);
-      playTick(); // play first note immediately
-    }, beatMs);
 
-    function playTick() {
+      // Fase de reproducción
       const idx = practiceState._noteIndex;
       const midi = practiceState._currentNotes[idx];
 
-      // Metronome click on beat boundaries (every `sub` notes)
-      if (practiceState.metronomeOn && subBeatCounter % sub === 0) {
-        Audio.playClick(idx === 0);
+      // Click de metrónomo en los límites de pulso (cada `sub` notas)
+      if (practiceState.metronomeOn && practiceState._subBeatCounter % sub === 0) {
+        Audio.playClickAt(idx === 0, when);
       }
-
-      // Play note
-      if (midi !== undefined && practiceState.soundOn) Audio.playNote(midi, noteDuration);
-
-      // Highlight on fretboard
-      FB.clearHighlights(elFretboard);
-      if (midi !== undefined) FB.highlightNoteMidi(midi, elFretboard);
-
-      // Beat indicator
-      updateBeatIndicator(idx, practiceState._currentNotes.length, false);
+      if (midi !== undefined && practiceState.soundOn) {
+        Audio.playNoteAt(midi, when, noteDuration);
+      }
+      practiceState._visualQueue.push({ time: when, midi: midi, noteIndex: idx, total: practiceState._currentNotes.length });
 
       practiceState._noteIndex++;
-      subBeatCounter++;
+      practiceState._subBeatCounter++;
+      practiceState._nextNoteTime = when + noteSec;
 
       if (practiceState._noteIndex >= practiceState._currentNotes.length) {
-        // Progression mode: advance to next chord's scale
-        if (practiceState.progressionMode) {
-          var canContinue = advanceProgChord();
-          if (!canContinue) {
-            // Progression finished one full cycle
-            var canAdvance = advanceAfterCycle();
-            if (canAdvance) {
-              // Reset progression to beginning for the new cycle
-              practiceState.progressionCurrentIdx = 0;
-              applyProgChordScale(0);
-              renderProgStrip();
-            } else {
-              stop();
-              return;
-            }
-          }
-          // Rebuild notes for new scale/group
-          practiceState._currentNotes = buildMidiNotes();
-          if (practiceState._currentNotes.length === 0) { stop(); return; }
-          practiceState._noteIndex = 0;
-          practiceState._beatCount++;
-        } else {
-          // Non-progression mode
-          var canAdvance = advanceAfterCycle();
-          if (canAdvance) {
-            practiceState._currentNotes = buildMidiNotes();
-            if (practiceState._currentNotes.length === 0) { stop(); return; }
-            practiceState._noteIndex = 0;
-            practiceState._beatCount++;
-          } else {
-            stop();
-          }
-        }
+        if (!handleCycleEnd()) practiceState._phase = 'ended';
       }
     }
+
+    // Avanza el estado al terminar un ciclo (progresión / grupos / transpose /
+    // climb / loop). Devuelve false cuando no hay que seguir (sin loop).
+    function handleCycleEnd() {
+      if (practiceState.progressionMode) {
+        var canContinue = advanceProgChord();
+        if (!canContinue) {
+          var canAdvance = advanceAfterCycle();
+          if (canAdvance) {
+            practiceState.progressionCurrentIdx = 0;
+            applyProgChordScale(0);
+            renderProgStrip();
+          } else {
+            return false;
+          }
+        }
+        practiceState._currentNotes = buildMidiNotes();
+        if (practiceState._currentNotes.length === 0) return false;
+        practiceState._noteIndex = 0;
+        practiceState._beatCount++;
+        return true;
+      } else {
+        if (!advanceAfterCycle()) return false;
+        practiceState._currentNotes = buildMidiNotes();
+        if (practiceState._currentNotes.length === 0) return false;
+        practiceState._noteIndex = 0;
+        practiceState._beatCount++;
+        return true;
+      }
+    }
+
+    // Scheduler: agenda todo lo que entre en la ventana de look-ahead.
+    function scheduler() {
+      var ahead = Audio.getAudioTime() + SCHEDULE_AHEAD;
+      while (practiceState._phase !== 'ended' && practiceState._nextNoteTime < ahead) {
+        scheduleNextEvent(practiceState._nextNoteTime);
+      }
+    }
+
+    // Render visual: consume la cola según el reloj de audio (vía rAF).
+    function draw() {
+      if (!practiceState.playing) return;
+      var now = Audio.getAudioTime();
+      var q = practiceState._visualQueue;
+      var due = null;
+      while (q.length && q[0].time <= now) due = q.shift();
+      if (due) {
+        if (due.countIn) {
+          updateBeatIndicator(due.idx, due.total, true);
+        } else {
+          FB.clearHighlights(elFretboard);
+          if (due.midi !== undefined) FB.highlightNoteMidi(due.midi, elFretboard);
+          updateBeatIndicator(due.noteIndex, due.total, false);
+        }
+      }
+      // Fin natural (sin loop): cuando ya no quedan eventos por mostrar.
+      if (practiceState._phase === 'ended' && q.length === 0) {
+        stop();
+        return;
+      }
+      practiceState._rafId = requestAnimationFrame(draw);
+    }
+
+    scheduler();
+    practiceState._schedulerTimer = setInterval(scheduler, LOOKAHEAD_MS);
+    practiceState._rafId = requestAnimationFrame(draw);
   }
 
   function pause() {
     if (!practiceState.playing) return;
-    if (practiceState._intervalId) {
-      clearInterval(practiceState._intervalId);
-      practiceState._intervalId = null;
+    if (practiceState._schedulerTimer) {
+      clearInterval(practiceState._schedulerTimer);
+      practiceState._schedulerTimer = null;
+    }
+    if (practiceState._rafId) {
+      cancelAnimationFrame(practiceState._rafId);
+      practiceState._rafId = null;
     }
     practiceState.playing = false;
     practiceState.paused = true;
@@ -1672,9 +1723,13 @@
   }
 
   function stop() {
-    if (practiceState._intervalId) {
-      clearInterval(practiceState._intervalId);
-      practiceState._intervalId = null;
+    if (practiceState._schedulerTimer) {
+      clearInterval(practiceState._schedulerTimer);
+      practiceState._schedulerTimer = null;
+    }
+    if (practiceState._rafId) {
+      cancelAnimationFrame(practiceState._rafId);
+      practiceState._rafId = null;
     }
     practiceState.playing = false;
     practiceState.paused = false;

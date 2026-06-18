@@ -67,34 +67,41 @@
 
     var loaded = 0;
     var total = midiRange.length;
+    var nextIdx = 0;
+    var activeLoads = 0;
+    // Limitar concurrencia: 55 fetch+decode simultáneos generaban bursts de
+    // decodeAudioData que trababan el hilo principal. De a 6 por vez.
+    var CONCURRENCY = 6;
 
-    midiRange.forEach(function (midi) {
+    function finish() {
+      // Marcamos ready si cargó al menos la mitad de los samples.
+      if (Object.keys(sampleBuffers).length > total / 2) samplesReady = true;
+      samplesLoading = false;
+    }
+
+    function loadOne(midi) {
       var noteName = midiToNoteName(midi);
       var url = SOUNDFONT_BASE + noteName + '.mp3';
-
-      fetch(url)
+      return fetch(url)
         .then(function (res) { return res.arrayBuffer(); })
         .then(function (data) { return ac.decodeAudioData(data); })
-        .then(function (buffer) {
-          sampleBuffers[midi] = buffer;
+        .then(function (buffer) { sampleBuffers[midi] = buffer; })
+        .catch(function () { /* ignorar fallos individuales */ })
+        .then(function () {
           loaded++;
-          if (loaded === total) {
-            samplesReady = true;
-            samplesLoading = false;
-          }
-        })
-        .catch(function () {
-          loaded++;
-          if (loaded === total) {
-            // Algunos fallaron, pero marcamos como ready
-            // si cargó al menos la mitad
-            if (Object.keys(sampleBuffers).length > total / 2) {
-              samplesReady = true;
-            }
-            samplesLoading = false;
-          }
+          if (loaded >= total) finish();
         });
-    });
+    }
+
+    function pump() {
+      while (nextIdx < total && activeLoads < CONCURRENCY) {
+        var midi = midiRange[nextIdx++];
+        activeLoads++;
+        loadOne(midi).then(function () { activeLoads--; pump(); });
+      }
+    }
+
+    pump();
   }
 
   // Iniciar carga al cargar la página
@@ -180,21 +187,26 @@
    * Reproduce una nota usando sample real si está disponible,
    * o Karplus-Strong como fallback.
    */
-  function playNote(midi, duration) {
+  function playNoteAt(midi, when, duration) {
     if (midi == null) return;
     duration = duration || 3;
     var ac = getContext();
     if (ac.state === 'suspended') ac.resume();
+    if (when == null || when < ac.currentTime) when = ac.currentTime + 0.02;
 
     var sample = samplesReady ? findClosestSample(midi) : null;
 
     if (sample) {
-      playSampleNote(ac, sample.buffer, sample.detune, ac.currentTime + 0.02, duration, 0.5);
+      playSampleNote(ac, sample.buffer, sample.detune, when, duration, 0.5);
     } else {
       var freq = midiToFreq(midi);
       var audioBuffer = createPluckBuffer(freq, duration, ac.sampleRate);
-      createSynthChain(ac, audioBuffer, ac.currentTime + 0.02, duration, 0.4);
+      createSynthChain(ac, audioBuffer, when, duration, 0.4);
     }
+  }
+
+  function playNote(midi, duration) {
+    playNoteAt(midi, getContext().currentTime + 0.02, duration);
   }
 
   /**
@@ -366,23 +378,36 @@
    * Reproduce un click de metrónomo usando un tono corto.
    * accent = true para el beat 1 (más agudo y fuerte).
    */
-  function playClick(accent) {
+  function playClickAt(accent, when) {
     var ac = getContext();
     if (ac.state === 'suspended') ac.resume();
+    if (when == null || when < ac.currentTime) when = ac.currentTime;
 
-    var now = ac.currentTime;
     var osc = ac.createOscillator();
     var gain = ac.createGain();
 
     osc.type = 'triangle';
     osc.frequency.value = accent ? 1200 : 800;
-    gain.gain.setValueAtTime(accent ? 0.35 : 0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    gain.gain.setValueAtTime(accent ? 0.35 : 0.2, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
 
     osc.connect(gain).connect(ac.destination);
-    osc.start(now);
-    osc.stop(now + 0.06);
+    osc.start(when);
+    osc.stop(when + 0.06);
   }
 
-  window.AudioEngine = { playNote, playChord, playScale, stopAll, midiToFreq, playClick };
+  function playClick(accent) {
+    playClickAt(accent, getContext().currentTime);
+  }
+
+  // ── Reloj de audio (para el scheduler look-ahead del modo práctica) ──
+
+  function getAudioTime() { return getContext().currentTime; }
+  function resumeContext() {
+    var ac = getContext();
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+
+  window.AudioEngine = { playNote, playNoteAt, playChord, playScale, stopAll, midiToFreq, playClick, playClickAt, getAudioTime, resumeContext };
 })();
