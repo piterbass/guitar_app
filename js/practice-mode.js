@@ -1476,13 +1476,17 @@
       var groups = getStringGroups();
       practiceState._stringPairIndex++;
       if (practiceState._stringPairIndex < groups.length) {
-        // More groups to play in this key
+        // More groups to play in this key: mostrar las cuerdas del nuevo grupo.
+        // Sin esto, el diapasón seguía mostrando el grupo anterior y las notas
+        // del nuevo grupo (otras cuerdas) sonaban pero no se resaltaban.
         updateStringModeInfo();
+        renderFretboard();
         return true; // continue
       }
       // All groups done, reset for next cycle
       practiceState._stringPairIndex = 0;
       updateStringModeInfo();
+      renderFretboard();
     }
 
     // 2. If position climb mode: advance to next position
