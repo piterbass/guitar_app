@@ -1,14 +1,17 @@
 // ============================================================
-// service-worker.js  –  Cache offline para Guitar App PWA
+// service-worker.js  –  Cache offline para Guitarreando PWA
 // ============================================================
 
-const CACHE_NAME = 'guitar-app-v66';
+const CACHE_NAME = 'guitar-app-v67';
 
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png',
   './js/music-theory.js',
   './js/chord-parser.js',
   './js/voicing-finder.js',

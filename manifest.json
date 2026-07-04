@@ -1,6 +1,6 @@
 {
-  "name": "Guitar App - Acordes & Escalas",
-  "short_name": "Guitar App",
+  "name": "Guitarreando - Acordes, Escalas y Cancionero",
+  "short_name": "Guitarreando",
   "description": "Generador de acordes, escalas y cancionero para guitarra",
   "start_url": "./index.html",
   "display": "standalone",
